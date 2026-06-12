@@ -1,0 +1,1373 @@
+{% extends "base.html" %}
+{% block title %}Ressources & Bureaux · SIGR-CA{% endblock %}
+{% block nav_ressources %}active{% endblock %}
+{% block page_title %}Gestion des ressources{% endblock %}
+{% block page_sub %}Zones, salles, matériel et équipements{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex;gap:8px;align-items:center;">
+  <button onclick="location.reload()" title="Actualiser" class="tb-ico-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  </button>
+  <button onclick="exportResourcesCSV()" title="Export CSV" class="tb-ico-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+  <button onclick="exportZonesPDF()" title="Rapport PDF global" class="tb-ico-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  </button>
+
+  <!-- ▶ BOUTON AJOUTER UNIFIÉ avec dropdown -->
+  <div style="position:relative;" id="addMenuWrap">
+    <button onclick="toggleAddMenu()"
+      style="height:36px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;border:none;border-radius:9px;font-family:var(--font);font-weight:600;font-size:13px;cursor:pointer;transition:all .15s;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Ajouter
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div id="addMenu" style="display:none;position:absolute;top:44px;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;min-width:190px;box-shadow:0 16px 48px rgba(0,0,0,.5);z-index:1000;overflow:hidden;">
+      <button onclick="resOpenModal('zone');toggleAddMenu(false)"
+        style="width:100%;padding:13px 18px;background:transparent;border:none;color:var(--text1);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;transition:background .15s;"
+        onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
+        <span style="font-size:18px;">🚪</span> Nouvelle zone
+      </button>
+      <div style="height:1px;background:var(--border);margin:0 12px;"></div>
+      <button onclick="resOpenModal('materiel');toggleAddMenu(false)"
+        style="width:100%;padding:13px 18px;background:transparent;border:none;color:var(--text1);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;transition:background .15s;"
+        onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
+        <span style="font-size:18px;">🖥️</span> Nouveau matériel
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --font:'Space Grotesk',sans-serif; --mono:'JetBrains Mono',monospace;
+  --bg0:#080d17; --bg1:#0d1320; --bg2:#111827; --bg3:#162032; --bg4:#1c2b40; --bg5:#243347;
+  --border:rgba(99,140,185,.12); --border2:rgba(99,140,185,.18); --border3:rgba(99,140,185,.28);
+  --text1:#e8edf5; --text2:#8fa3bc; --text3:#56708a;
+  --blue:#3b82f6; --blue2:#60a5fa; --cyan:#06b6d4; --green:#10b981;
+  --amber:#f59e0b; --red:#ef4444; --purple:#8b5cf6;
+  --radius:14px; --radius-sm:8px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{font-family:var(--font)!important;background:var(--bg0)!important;}
+.dash-wrap{display:flex;flex-direction:column;gap:20px;padding-bottom:40px;}
+.tb-ico-btn{width:36px;height:36px;border-radius:9px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;}
+.tb-ico-btn:hover{background:var(--bg4);color:var(--text1);border-color:var(--border3);}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+@media(max-width:1300px){.kpi-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:768px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 18px 16px;position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s;cursor:default;}
+.kpi::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at top left,var(--kpi-glow,.05) 0%,transparent 65%);pointer-events:none;}
+.kpi:hover{transform:translateY(-4px);box-shadow:var(--kpi-shadow,none);}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-grad);box-shadow:0 0 12px var(--kpi-color);}
+.kpi-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.kpi-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);}
+.kpi-icon-wrap{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--kpi-icon-bg);border:1px solid var(--kpi-icon-border);font-size:18px;flex-shrink:0;}
+.kpi-val{font-family:var(--mono);font-size:38px;font-weight:700;color:var(--kpi-color);line-height:1;margin-bottom:8px;text-shadow:0 0 30px var(--kpi-glow-text);}
+.kpi-sub{font-size:11px;color:var(--text3);}
+.kpi-bar{margin-top:12px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.kpi-bar-fill{height:100%;background:var(--kpi-grad);border-radius:2px;transition:width 1s ease;}
+.kpi.blue  {--kpi-color:var(--blue);  --kpi-grad:linear-gradient(90deg,#1d4ed8,#3b82f6);--kpi-glow:rgba(59,130,246,.06);--kpi-shadow:0 0 20px rgba(59,130,246,.25);--kpi-icon-bg:rgba(59,130,246,.12);--kpi-icon-border:rgba(59,130,246,.22);--kpi-glow-text:rgba(59,130,246,.4);}
+.kpi.green {--kpi-color:var(--green); --kpi-grad:linear-gradient(90deg,#059669,#10b981);--kpi-glow:rgba(16,185,129,.06);--kpi-shadow:0 0 20px rgba(16,185,129,.25);--kpi-icon-bg:rgba(16,185,129,.12);--kpi-icon-border:rgba(16,185,129,.22);--kpi-glow-text:rgba(16,185,129,.4);}
+.kpi.amber {--kpi-color:var(--amber); --kpi-grad:linear-gradient(90deg,#d97706,#f59e0b);--kpi-glow:rgba(245,158,11,.06);--kpi-shadow:0 0 20px rgba(245,158,11,.25);--kpi-icon-bg:rgba(245,158,11,.12);--kpi-icon-border:rgba(245,158,11,.22);--kpi-glow-text:rgba(245,158,11,.4);}
+.kpi.purple{--kpi-color:var(--purple);--kpi-grad:linear-gradient(90deg,#7c3aed,#8b5cf6);--kpi-glow:rgba(139,92,246,.06);--kpi-shadow:0 0 20px rgba(139,92,246,.25);--kpi-icon-bg:rgba(139,92,246,.12);--kpi-icon-border:rgba(139,92,246,.22);--kpi-glow-text:rgba(139,92,246,.4);}
+.kpi.red   {--kpi-color:var(--red);   --kpi-grad:linear-gradient(90deg,#dc2626,#ef4444);--kpi-glow:rgba(239,68,68,.06);--kpi-shadow:0 0 20px rgba(239,68,68,.25);--kpi-icon-bg:rgba(239,68,68,.12);--kpi-icon-border:rgba(239,68,68,.22);--kpi-glow-text:rgba(239,68,68,.4);}
+
+/* Tabs */
+.res-tabs{display:flex;gap:4px;background:var(--bg3);padding:5px;border-radius:12px;border:1px solid var(--border);margin-bottom:0;}
+.res-tab{flex:1;padding:11px 20px;border-radius:9px;border:none;background:transparent;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;}
+.res-tab.active{background:var(--bg2);color:var(--text1);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.res-tab:hover:not(.active){color:var(--text1);}
+
+/* Filters */
+.filters-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.res-search{flex:1;min-width:200px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text1);font-size:13px;font-family:var(--font);outline:none;transition:all .15s;}
+.res-search:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
+.res-search::placeholder{color:var(--text3);}
+.res-select{padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text1);font-size:13px;font-family:var(--font);outline:none;cursor:pointer;min-width:150px;}
+
+/* Zone cards */
+.zones-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;}
+.zone-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .2s;cursor:pointer;}
+.zone-card:hover{transform:translateY(-3px);border-color:var(--border3);box-shadow:0 8px 30px rgba(0,0,0,.3);}
+.zone-hdr{padding:14px 16px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.zone-name{font-size:14px;font-weight:700;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.zone-code{font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;}
+.zone-body{padding:16px;}
+.zone-row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px;color:var(--text2);}
+.zone-bar{background:var(--bg4);border-radius:6px;height:5px;overflow:hidden;margin-bottom:10px;}
+.zone-fill{height:100%;border-radius:6px;transition:width .5s ease;}
+.zone-fill.low{background:var(--green);}
+.zone-fill.mid{background:var(--amber);}
+.zone-fill.high{background:var(--red);}
+.zone-foot{padding:10px 14px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:5px;flex-wrap:wrap;}
+.zone-meta-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;font-family:var(--mono);}
+.tag-pub{background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2);}
+.tag-std{background:rgba(59,130,246,.1);color:var(--blue2);border:1px solid rgba(59,130,246,.2);}
+.tag-rest{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+.tag-crit{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+
+/* Materiel cards */
+.materiel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.mat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .2s;}
+.mat-card:hover{transform:translateY(-3px);border-color:var(--border3);box-shadow:0 8px 30px rgba(0,0,0,.3);}
+.mat-img{width:100%;height:130px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:48px;overflow:hidden;position:relative;}
+.mat-img img{width:100%;height:100%;object-fit:cover;}
+.mat-img-overlay{position:absolute;top:8px;right:8px;}
+.mat-hdr{padding:13px 15px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.mat-name{font-size:13px;font-weight:700;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mat-cat-badge{font-size:10px;padding:3px 9px;border-radius:20px;background:rgba(59,130,246,.12);color:var(--blue2);border:1px solid rgba(59,130,246,.2);font-family:var(--mono);font-weight:600;flex-shrink:0;}
+.mat-body{padding:14px 15px;}
+.mat-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);margin-bottom:5px;}
+.mat-row strong{color:var(--text1);}
+.inv-badge{display:inline-block;font-family:var(--mono);font-size:11px;background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.2);border-radius:6px;padding:2px 9px;font-weight:600;letter-spacing:.5px;}
+.mat-foot{padding:10px 14px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:5px;justify-content:flex-end;}
+
+/* Status badges */
+.sbadge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;font-family:var(--mono);letter-spacing:.5px;}
+.s-dispo  {background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2);}
+.s-utilise{background:rgba(59,130,246,.12);color:var(--blue2);border:1px solid rgba(59,130,246,.2);}
+.s-maint  {background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+.s-hs     {background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.15);}
+.occ-dispo{background:rgba(16,185,129,.12);color:var(--green);}
+.occ-mid  {background:rgba(245,158,11,.12);color:var(--amber);}
+.occ-full {background:rgba(239,68,68,.12);color:var(--red);}
+
+/* Buttons */
+.btn{padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:11.5px;font-family:var(--font);transition:all .15s;display:inline-flex;align-items:center;gap:5px;text-decoration:none;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:var(--blue2);}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--bg4);color:var(--text1);border-color:var(--border3);}
+.btn-danger{background:transparent;color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.btn-danger:hover{background:rgba(239,68,68,.1);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px;grid-column:1/-1;color:var(--text3);}
+.empty-ico{font-size:52px;margin-bottom:12px;opacity:.4;}
+
+/* Modal overlay */
+.res-modal-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,13,23,.88);backdrop-filter:blur(6px);align-items:center;justify-content:center;}
+.res-modal-overlay.open{display:flex;}
+.res-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);width:640px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.55);animation:resModalIn .22s cubic-bezier(.22,1,.36,1);}
+@keyframes resModalIn{from{opacity:0;transform:translateY(18px) scale(.97);}to{opacity:1;transform:none;}}
+.res-modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:1;}
+.res-modal-title{font-weight:700;font-size:16px;color:var(--text1);}
+.res-modal-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .15s;}
+.res-modal-close:hover{background:var(--bg4);color:var(--text1);}
+.res-modal-body{padding:24px;}
+.res-modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--bg2);position:sticky;bottom:0;}
+
+/* Form */
+.form-group{margin-bottom:16px;}
+.form-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:6px;}
+.form-control{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text1);font-size:13px;font-family:var(--font);outline:none;transition:all .15s;}
+.form-control:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.section-divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:20px 0 12px;display:flex;align-items:center;gap:8px;}
+.section-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* N° Inventaire preview */
+.inv-preview-box{background:rgba(139,92,246,.06);border:1px dashed rgba(139,92,246,.3);border-radius:8px;padding:12px 16px;margin-top:8px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text2);}
+.inv-preview-box strong{font-family:var(--mono);font-size:15px;color:var(--purple);letter-spacing:1px;}
+
+/* Photo upload */
+.photo-upload-area{border:2px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--bg3);}
+.photo-upload-area:hover{border-color:var(--blue);background:var(--bg4);}
+.photo-upload-area.has-preview{padding:0;border-style:solid;}
+.photo-upload-area .photo-preview{width:100%;height:140px;object-fit:cover;border-radius:8px;display:block;}
+.photo-upload-overlay{position:absolute;inset:0;background:rgba(8,13,23,.7);border-radius:8px;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0;transition:opacity .2s;}
+.photo-upload-area.has-preview:hover .photo-upload-overlay{opacity:1;}
+
+/* Specs section */
+.specs-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:4px;}
+
+/* Toast */
+.res-toast{position:fixed;bottom:24px;right:24px;padding:13px 20px;border-radius:10px;font-size:13px;color:#fff;font-weight:600;z-index:99999;opacity:0;transform:translateY(10px);transition:.3s;max-width:380px;pointer-events:none;font-family:var(--font);}
+*{scrollbar-width:thin;scrollbar-color:var(--bg5) transparent;}
+</style>
+
+<div class="dash-wrap">
+
+    <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi blue">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Zones</span><div class="kpi-icon-wrap">🚪</div></div>
+      <div class="kpi-val">{{ total_bureaux|default:"0" }}</div>
+      <div class="kpi-sub">Bureaux & salles</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Zones actives</span><div class="kpi-icon-wrap">✅</div></div>
+      <div class="kpi-val">{{ zones_actives|default:"0" }}</div>
+      <div class="kpi-sub">En service</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total_bureaux %}{% widthratio zones_actives total_bureaux 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Matériel</span><div class="kpi-icon-wrap">🖥️</div></div>
+      <div class="kpi-val">{{ total_materiel|default:"0" }}</div>
+      <div class="kpi-sub">Équipements</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Maintenance</span><div class="kpi-icon-wrap">🔧</div></div>
+      <div class="kpi-val">{{ materiel_maintenance|default:"0" }}</div>
+      <div class="kpi-sub">En réparation</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total_materiel %}{% widthratio materiel_maintenance total_materiel 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+  </div>
+  <!-- ONGLETS -->
+  <div class="res-tabs" id="resTabs">
+    <button class="res-tab active" onclick="resTab('zones',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Zones & Bureaux <span style="font-family:var(--mono);font-size:10px;background:var(--bg4);padding:2px 7px;border-radius:10px;">{{ total_bureaux|default:"0" }}</span>
+    </button>
+    <button class="res-tab" onclick="resTab('materiel',this)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Matériel<span style="font-family:var(--mono);font-size:10px;background:var(--bg4);padding:2px 7px;border-radius:10px;">{{ total_materiel|default:"0" }}</span>
+    </button>
+  </div>
+
+  <!-- ══ PANEL ZONES ══ -->
+  <div id="panelZones">
+    <div class="filters-bar" style="margin-bottom:16px;">
+      <input type="text" id="searchZone" class="res-search" placeholder="🔍 Rechercher une zone..." oninput="filterZones()">
+      <select id="etageFilter" class="res-select" onchange="filterZones()">
+        <option value="all">Tous les étages</option>
+        <option value="0">RDC</option>
+        <option value="1">Étage 1</option>
+        <option value="2">Étage 2</option>
+        <option value="3">Étage 3</option>
+      </select>
+      <select id="securiteFilter" class="res-select" onchange="filterZones()">
+        <option value="all">Tous niveaux</option>
+        <option value="public">🟢 Public</option>
+        <option value="standard">🔵 Standard</option>
+        <option value="restreint">🟠 Restreint</option>
+        <option value="critique">🔴 Critique</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="resOpenModal('zone')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Zone
+      </button>
+    </div>
+
+    <div class="zones-grid" id="zonesGrid">
+      {% for bureau in bureaux %}
+      <div class="zone-card"
+           data-id="{{ bureau.id }}"
+           data-name="{{ bureau.nom|lower }}"
+           data-etage="{{ bureau.etage|default:'0' }}"
+           data-securite="{{ bureau.niveau_securite|default:'standard' }}"
+           onclick="showZoneDetails('{{ bureau.id }}')">
+
+        <div class="zone-hdr">
+          <span class="zone-name">{{ bureau.nom }}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <span class="zone-code">{{ bureau.code_bureau|default:"—" }}</span>
+            {% if bureau.niveau_securite == 'public' %}<span class="zone-meta-tag tag-pub">🟢 Public</span>
+            {% elif bureau.niveau_securite == 'restreint' %}<span class="zone-meta-tag tag-rest">🟠 Restreint</span>
+            {% elif bureau.niveau_securite == 'critique' %}<span class="zone-meta-tag tag-crit">🔴 Critique</span>
+            {% else %}<span class="zone-meta-tag tag-std">🔵 Standard</span>{% endif %}
+          </div>
+        </div>
+
+                <div class="zone-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:12px;color:var(--text3);">
+              {% if bureau.etage %}🏢 Étage {{ bureau.etage }}{% else %}🏢 RDC{% endif %}
+            </span>
+            <span class="sbadge {% if bureau.statut == 'inactif' %}s-hs{% else %}s-dispo{% endif %}">
+              {% if bureau.statut == 'inactif' %}⛔ Inactif{% else %}🟢 Actif{% endif %}
+            </span>
+          </div>
+          {% if bureau.description %}
+          <div style="font-size:11px;color:var(--text3);line-height:1.5;border-top:1px solid var(--border);padding-top:8px;">
+            {{ bureau.description|truncatechars:90 }}
+          </div>
+          {% endif %}
+        </div>
+
+               <div class="zone-foot">
+          <button class="btn btn-ghost btn-sm" title="Voir les détails"
+            onclick="event.stopPropagation();showZoneDetails('{{ bureau.id }}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Détails
+          </button>
+          <button class="btn btn-ghost btn-sm" title="Modifier"
+            onclick="event.stopPropagation();resEditZone('{{ bureau.id }}','{{ bureau.nom|escapejs }}','{{ bureau.code_bureau|default:''|escapejs }}','{{ bureau.etage|default:'0' }}','{{ bureau.capacite_max|default:'10' }}','{{ bureau.niveau_securite|default:'standard' }}','{{ bureau.description|default:''|escapejs }}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Modifier
+          </button>
+          <button class="btn btn-ghost btn-sm" title="Rapport PDF" onclick="event.stopPropagation();exportZonePDF('{{ bureau.id }}','{{ bureau.nom|escapejs }}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            PDF
+          </button>
+          <button class="btn btn-danger btn-sm" title="Supprimer" onclick="event.stopPropagation();resDeleteZone('{{ bureau.id }}','{{ bureau.nom|escapejs }}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state">
+        <div class="empty-ico">🚪</div>
+        <div style="margin-bottom:14px;">Aucune zone enregistrée</div>
+        <button class="btn btn-primary" onclick="resOpenModal('zone')">+ Ajouter une zone</button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ══ PANEL MATÉRIEL ══ -->
+  <div id="panelMateriel" style="display:none;">
+    <div class="filters-bar" style="margin-bottom:16px;">
+      <input type="text" id="searchMateriel" class="res-search" placeholder="🔍 Nom, inventaire, série, fournisseur..." oninput="filterMateriel()">
+      <select id="categorieFilter" class="res-select" onchange="filterMateriel()">
+        <option value="all">Toutes catégories</option>
+        <option value="informatique">💻 Informatique</option>
+        <option value="mobilier">🪑 Mobilier</option>
+        <option value="audiovisuel">📽️ Audiovisuel</option>
+        <option value="imprimante">🖨️ Imprimante</option>
+        <option value="securite">🔒 Sécurité</option>
+        <option value="vehicule">🚗 Véhicule</option>
+        <option value="laboratoire">🔬 Laboratoire</option>
+        <option value="autre">📦 Autre</option>
+      </select>
+      <select id="statutFilter" class="res-select" onchange="filterMateriel()">
+        <option value="all">Tous statuts</option>
+        <option value="disponible">✅ Disponible</option>
+        <option value="utilise">🔄 Utilisé</option>
+        <option value="maintenance">🔧 Maintenance</option>
+        <option value="hors_service">❌ Hors service</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="resOpenModal('materiel')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Matériel
+      </button>
+    </div>
+
+    <div class="materiel-grid" id="materielGrid">
+      {% for mat in materiels %}
+      <div class="mat-card"
+           data-categorie="{{ mat.categorie }}"
+           data-statut="{{ mat.statut }}"
+           data-nom="{{ mat.nom|lower }} {{ mat.num_inventaire|default:''|lower }} {{ mat.numero_serie|default:''|lower }} {{ mat.fournisseur|default:''|lower }}">
+
+        <div class="mat-img">
+          {% if mat.photo %}
+            <img src="{% if mat.photo|slice:':4' == 'http' %}{{ mat.photo }}{% else %}/media/{{ mat.photo }}{% endif %}" alt="{{ mat.nom }}" loading="lazy">
+          {% elif mat.categorie == 'informatique' %}💻
+          {% elif mat.categorie == 'mobilier' %}🪑
+          {% elif mat.categorie == 'audiovisuel' %}📽️
+          {% elif mat.categorie == 'imprimante' %}🖨️
+          {% elif mat.categorie == 'securite' %}🔒
+          {% elif mat.categorie == 'vehicule' %}🚗
+          {% elif mat.categorie == 'laboratoire' %}🔬
+          {% else %}📦{% endif %}
+          <div class="mat-img-overlay">
+            {% if mat.statut == 'disponible' %}<span class="sbadge s-dispo">✅ Dispo</span>
+            {% elif mat.statut == 'utilise' %}<span class="sbadge s-utilise">🔄 Utilisé</span>
+            {% elif mat.statut == 'maintenance' %}<span class="sbadge s-maint">🔧 Maint.</span>
+            {% else %}<span class="sbadge s-hs">❌ H.S.</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="mat-hdr">
+          <span class="mat-name" title="{{ mat.nom }}">{{ mat.nom }}</span>
+          <span class="mat-cat-badge">{{ mat.categorie|title }}</span>
+        </div>
+
+        <div class="mat-body">
+          {% if mat.num_inventaire %}
+          <div class="mat-row">🏷️ <span class="inv-badge">{{ mat.num_inventaire }}</span></div>
+          {% endif %}
+          {% if mat.fournisseur %}
+          <div class="mat-row">🏢 <strong>{{ mat.fournisseur }}</strong></div>
+          {% endif %}
+          {% if mat.marque or mat.modele %}
+          <div class="mat-row">🏭 {{ mat.marque }} {{ mat.modele }}</div>
+          {% endif %}
+          {% if mat.numero_serie %}
+          <div class="mat-row">🔢 <code style="font-family:var(--mono);font-size:11px;color:var(--text3);">{{ mat.numero_serie }}</code></div>
+          {% endif %}
+          {% if mat.zone %}
+          <div class="mat-row">📍 Zone : <strong>{{ mat.zone }}</strong></div>
+          {% endif %}
+          {% if mat.processeur or mat.ram or mat.stockage %}
+          <div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.6;">
+            {% if mat.processeur %}CPU: {{ mat.processeur }}<br>{% endif %}
+            {% if mat.ram %}RAM: {{ mat.ram }}<br>{% endif %}
+            {% if mat.stockage %}HDD: {{ mat.stockage }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+
+                <div class="mat-foot">
+          <button class="btn btn-ghost btn-sm" onclick="showMaterielDetails('{{ mat.id }}')" title="Détails">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Détails
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="resEditMateriel('{{ mat.id }}')" title="Modifier">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Modifier
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="exportMaterielPDF('{{ mat.id }}')" title="Fiche PDF">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            PDF
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="resDeleteMateriel('{{ mat.id }}','{{ mat.nom|escapejs }}')" title="Supprimer">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty-state">
+        <div class="empty-ico">🖥️</div>
+        <div style="margin-bottom:14px;">Aucun matériel enregistré</div>
+        <button class="btn btn-primary" onclick="resOpenModal('materiel')">+ Ajouter du matériel</button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{% if request.session.is_staff %}
+<!-- ══ PARAMÈTRES RÉSERVATION (admin seulement) ══ -->
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    <span style="font-weight:700;font-size:14px;color:var(--text1);">Paramètres de réservation</span>
+    <span style="font-size:10px;background:rgba(59,130,246,.12);color:var(--blue2);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:2px 9px;font-family:var(--mono);font-weight:600;">Admin</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+    <!-- Salles -->
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--blue2);margin-bottom:14px;">🚪 Salles</div>
+      <div class="form-group">
+        <label class="form-label">Durée minimum (minutes)</label>
+        <input type="number" id="salle_min_minutes" class="form-control" min="1" max="1440"
+               value="{{ params_resa.salle_min_minutes|default:'30' }}">
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">Défaut : 30 min</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Durée maximum (minutes)</label>
+        <input type="number" id="salle_max_minutes" class="form-control" min="30"
+               value="{{ params_resa.salle_max_minutes|default:'1440' }}">
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">Défaut : 1440 min (24h)</div>
+      </div>
+    </div>
+
+    <!-- Matériel -->
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:18px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--purple);margin-bottom:14px;">📦 Matériel</div>
+      <div class="form-group">
+        <label class="form-label">Durée minimum (minutes)</label>
+        <input type="number" id="materiel_min_minutes" class="form-control" min="1"
+               value="{{ params_resa.materiel_min_minutes|default:'60' }}">
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">Défaut : 60 min (1h)</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Durée maximum (minutes)</label>
+        <input type="number" id="materiel_max_minutes" class="form-control" min="60"
+               value="{{ params_resa.materiel_max_minutes|default:'525600' }}">
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;">Défaut : 525600 min (1 an)</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+    <button onclick="saveParamsResa()"
+      style="padding:10px 22px;background:var(--blue);color:#fff;border:none;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font);transition:all .15s;"
+      onmouseover="this.style.background='var(--blue2)'" onmouseout="this.style.background='var(--blue)'">
+      💾 Sauvegarder les paramètres
+    </button>
+  </div>
+</div>
+{% endif %}
+</div><!-- /dash-wrap -->
+
+<!-- ══ MODAL ZONE ══ -->
+<div class="res-modal-overlay" id="resModalZone" onclick="if(event.target===this)resCloseModal('zone');">
+  <div class="res-modal">
+    <div class="res-modal-head">
+      <span class="res-modal-title" id="resZoneModalTitle">🚪 Nouvelle zone</span>
+      <button class="res-modal-close" type="button" onclick="resCloseModal('zone');">✕</button>
+    </div>
+    <div class="res-modal-body">
+      <input type="hidden" id="resZoneId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Nom de la zone <span style="color:var(--red)">*</span></label>
+          <input type="text" id="resZoneNom" class="form-control" placeholder="Salle de réunion A">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Code / Référence</label>
+          <input type="text" id="resZoneCode" class="form-control" placeholder="SALLE-A01" style="font-family:var(--mono);">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Étage</label>
+          <select id="resZoneEtage" class="form-control">
+            <option value="0">RDC</option>
+            <option value="1">Étage 1</option>
+            <option value="2">Étage 2</option>
+            <option value="3">Étage 3</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Capacité (personnes)</label>
+          <input type="number" id="resZoneCapacite" class="form-control" value="10" min="1">
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Niveau de sécurité</label>
+          <select id="resZoneSecurite" class="form-control">
+            <option value="public">🟢 Public</option>
+            <option value="standard" selected>🔵 Standard</option>
+            <option value="restreint">🟠 Restreint</option>
+            <option value="critique">🔴 Critique</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Description</label>
+          <textarea id="resZoneDesc" class="form-control" rows="3" placeholder="Description de la zone..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="res-modal-foot">
+      <button class="btn btn-ghost" type="button" onclick="resCloseModal('zone');">Annuler</button>
+      <button class="btn btn-primary" type="button" onclick="resSaveZone();" id="resBtnSaveZone">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL MATÉRIEL — VERSION AMÉLIORÉE ══ -->
+<div class="res-modal-overlay" id="resModalMateriel" onclick="if(event.target===this)resCloseModal('materiel');">
+  <div class="res-modal" style="width:700px;">
+    <div class="res-modal-head">
+      <span class="res-modal-title" id="resMatModalTitle">🖥️ Nouveau matériel</span>
+      <button class="res-modal-close" type="button" onclick="resCloseModal('materiel');">✕</button>
+    </div>
+    <div class="res-modal-body">
+      <input type="hidden" id="resMatId">
+
+      <!-- ── Informations générales ── -->
+      <div class="section-divider">📋 Informations générales</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Nom <span style="color:var(--red)">*</span></label>
+          <input type="text" id="resMatNom" class="form-control" placeholder="Ordinateur Dell Latitude">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Catégorie</label>
+          <select id="resMatCategorie" class="form-control" onchange="resUpdateInvPreview();resToggleSpecs();">
+            <option value="informatique">💻 Informatique</option>
+            <option value="mobilier">🪑 Mobilier</option>
+            <option value="audiovisuel">📽️ Audiovisuel</option>
+            <option value="imprimante">🖨️ Imprimante</option>
+            <option value="securite">🔒 Sécurité</option>
+            <option value="vehicule">🚗 Véhicule</option>
+            <option value="laboratoire">🔬 Laboratoire</option>
+            <option value="autre">📦 Autre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Marque</label>
+          <input type="text" id="resMatMarque" class="form-control" placeholder="Dell" oninput="resUpdateInvPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modèle</label>
+          <input type="text" id="resMatModele" class="form-control" placeholder="Latitude 5540">
+        </div>
+        <div class="form-group">
+          <label class="form-label">N° de série</label>
+          <input type="text" id="resMatSerie" class="form-control" placeholder="SN-XXXXX" style="font-family:var(--mono);">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date d'achat</label>
+          <input type="date" id="resMatDateAchat" class="form-control" onchange="resSyncAnnee()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zone assignée</label>
+          <select id="resMatZone" class="form-control">
+            <option value="">— Choisir une zone —</option>
+            {% for bureau in bureaux %}
+            <option value="{{ bureau.nom }}">{{ bureau.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Statut</label>
+          <select id="resMatStatut" class="form-control">
+            <option value="disponible">✅ Disponible</option>
+            <option value="utilise">🔄 Utilisé</option>
+            <option value="maintenance">🔧 Maintenance</option>
+            <option value="hors_service">❌ Hors service</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fournisseur</label>
+          <input type="text" id="resMatFournisseur" class="form-control" placeholder="Dell Technologies" oninput="resUpdateInvPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valeur d'achat (DA)</label>
+          <input type="text" id="resMatValeur" class="form-control" placeholder="150 000">
+        </div>
+      </div>
+
+      <!-- ── N° Inventaire : [FOURNISSEUR-]PREFIX-ANNEE-NNNNN ── -->
+      <div class="section-divider">🏷️ Numéro d'inventaire</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">Format : <span style="font-family:var(--mono);color:var(--purple);">[FOURNISSEUR-]CAT-ANNÉE-NNNNN</span> &nbsp;— généré automatiquement à partir du fournisseur renseigné ci-dessus</div>
+        <div class="form-grid">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Année d'inventaire</label>
+            <input type="number" id="resMatAnneeInv" class="form-control" style="font-family:var(--mono);" oninput="resUpdateInvPreview()">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">N° séquentiel (optionnel — auto si vide)</label>
+            <input type="number" id="resMatSeqInv" class="form-control" placeholder="auto" style="font-family:var(--mono);" oninput="resUpdateInvPreview()">
+          </div>
+        </div>
+        <div class="inv-preview-box" style="margin-top:12px;">
+          <span>Aperçu :</span>
+          <strong id="resInvPreview">—</strong>
+          <span style="font-size:11px;color:var(--text3);margin-left:auto;">Modifiable si besoin ↓</span>
+        </div>
+        <div class="form-group" style="margin-top:10px;margin-bottom:0;">
+          <label class="form-label">N° inventaire final (éditable manuellement)</label>
+          <input type="text" id="resMatInventaire" class="form-control" placeholder="DELL-INF-2026-00001" style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--purple);" oninput="this.dataset.manual='1'">
+        </div>
+      </div>
+
+      <!-- ── Photo ── -->
+      <div class="section-divider">📷 Photo du matériel</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Téléverser une image</label>
+          <div class="photo-upload-area" id="photoUploadArea" onclick="document.getElementById('resMatPhotoFile').click()">
+            <img src="" alt="" class="photo-preview" id="photoPreviewImg" style="display:none;">
+            <div class="photo-upload-overlay" id="photoOverlay">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <span style="color:#fff;font-size:12px;font-weight:600;">Changer</span>
+            </div>
+            <div id="photoPlaceholder" style="pointer-events:none;">
+              <div style="font-size:32px;margin-bottom:8px;">📷</div>
+              <div style="font-size:12px;color:var(--text2);font-weight:600;">Cliquer pour ajouter une photo</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px;">JPG, PNG, WEBP — max 5 Mo</div>
+            </div>
+          </div>
+          <input type="file" id="resMatPhotoFile" accept="image/*" style="display:none;" onchange="resHandlePhotoUpload(this)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ou URL de l'image</label>
+          <input type="text" id="resMatPhoto" class="form-control" placeholder="https://..." oninput="resPreviewFromUrl(this.value)">
+          <div style="font-size:10px;color:var(--text3);margin-top:6px;">Si une image est uploadée, elle sera utilisée en priorité</div>
+          <div id="resPhotoMsg" style="font-size:11px;color:var(--green);margin-top:8px;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- ── Spécifications techniques (conditionnel) ── -->
+      <div id="resTechSpecs" style="display:none;">
+        <div class="section-divider">⚙️ Spécifications techniques</div>
+        <div class="specs-box">
+          <div class="form-grid">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Processeur (CPU)</label>
+              <input type="text" id="resMatCPU" class="form-control" placeholder="Intel Core i7-1255U">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Mémoire RAM</label>
+              <input type="text" id="resMatRAM" class="form-control" placeholder="16 Go DDR4">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Stockage</label>
+              <input type="text" id="resMatHDD" class="form-control" placeholder="512 Go SSD NVMe">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Système d'exploitation</label>
+              <input type="text" id="resMatOS" class="form-control" placeholder="Windows 11 Pro">
+            </div>
+            <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
+              <label class="form-label">Écran / Résolution</label>
+              <input type="text" id="resMatEcran" class="form-control" placeholder='14" FHD 1920×1080'>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Description ── -->
+      <div class="section-divider">📝 Description / Remarques</div>
+      <div class="form-group">
+        <textarea id="resMatDesc" class="form-control" rows="3" placeholder="État, accessoires inclus, garantie, notes..."></textarea>
+      </div>
+
+    </div><!-- /modal-body -->
+    <div class="res-modal-foot">
+      <button class="btn btn-ghost" type="button" onclick="resCloseModal('materiel');">Annuler</button>
+      <button class="btn btn-primary" type="button" onclick="resSaveMateriel();" id="resBtnSaveMat">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+<!-- ══ MODAL DÉTAILS ZONE ══ -->
+<div class="res-modal-overlay" id="resModalZoneDetails" onclick="if(event.target===this)this.classList.remove('open');">
+  <div class="res-modal" style="width:580px;">
+    <div class="res-modal-head">
+      <span class="res-modal-title" id="zoneDetailsTitle">🚪 Détails de la zone</span>
+      <button class="res-modal-close" onclick="document.getElementById('resModalZoneDetails').classList.remove('open');document.body.style.overflow='';">✕</button>
+    </div>
+    <div class="res-modal-body" id="zoneDetailsBody">
+      <!-- rempli par JS -->
+    </div>
+    <div class="res-modal-foot">
+      <button class="btn btn-ghost" onclick="document.getElementById('resModalZoneDetails').classList.remove('open');document.body.style.overflow='';">Fermer</button>
+      <button class="btn btn-primary" id="zoneDetailsBtnEdit" onclick="">✏️ Modifier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DÉTAILS MATÉRIEL ══ -->
+<div class="res-modal-overlay" id="resModalMatDetails" onclick="if(event.target===this)this.classList.remove('open');">
+  <div class="res-modal" style="width:680px;">
+    <div class="res-modal-head">
+      <span class="res-modal-title" id="matDetailsTitle">🖥️ Détails du matériel</span>
+      <button class="res-modal-close" onclick="document.getElementById('resModalMatDetails').classList.remove('open');document.body.style.overflow='';">✕</button>
+    </div>
+    <div class="res-modal-body" id="matDetailsBody">
+      <!-- rempli par JS -->
+    </div>
+    <div class="res-modal-foot">
+      <button class="btn btn-ghost" onclick="document.getElementById('resModalMatDetails').classList.remove('open');document.body.style.overflow='';">Fermer</button>
+      <button class="btn btn-primary" id="matDetailsBtnEdit" onclick="">✏️ Modifier</button>
+    </div>
+  </div>
+</div>
+<div class="res-toast" id="restoast"></div>
+
+<script>
+const RES_CSRF = '{{ csrf_token }}';
+var materielsData = {{ materiels_json|safe|default:'[]' }};
+
+// Prefixes catégories
+const CAT_PREFIXES = {
+  informatique:'INF', mobilier:'MOB', audiovisuel:'AUD',
+  imprimante:'IMP', securite:'SEC', vehicule:'VEH',
+  laboratoire:'LAB', autre:'MAT'
+};
+
+/* ══ Menu Ajouter ══ */
+var _addMenuOpen = false;
+function toggleAddMenu(force) {
+  _addMenuOpen = (force !== undefined) ? force : !_addMenuOpen;
+  document.getElementById('addMenu').style.display = _addMenuOpen ? 'block' : 'none';
+}
+document.addEventListener('click', function(e) {
+  var wrap = document.getElementById('addMenuWrap');
+  if (wrap && !wrap.contains(e.target)) toggleAddMenu(false);
+});
+
+/* ══ Onglets ══ */
+function resTab(tab, el) {
+  document.getElementById('panelZones').style.display    = tab === 'zones'    ? 'block' : 'none';
+  document.getElementById('panelMateriel').style.display = tab === 'materiel' ? 'block' : 'none';
+  document.querySelectorAll('#resTabs .res-tab').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+}
+
+/* ══ Filtres ══ */
+function filterZones() {
+  var q   = document.getElementById('searchZone').value.toLowerCase();
+  var et  = document.getElementById('etageFilter').value;
+  var sec = document.getElementById('securiteFilter').value;
+  document.querySelectorAll('#zonesGrid .zone-card').forEach(function(c){
+    var ok = c.dataset.name.includes(q)
+          && (et  === 'all' || c.dataset.etage    === et)
+          && (sec === 'all' || c.dataset.securite === sec);
+    c.style.display = ok ? '' : 'none';
+  });
+}
+function filterMateriel() {
+  var q   = document.getElementById('searchMateriel').value.toLowerCase();
+  var cat = document.getElementById('categorieFilter').value;
+  var st  = document.getElementById('statutFilter').value;
+  document.querySelectorAll('#materielGrid .mat-card').forEach(function(c){
+    var ok = c.dataset.nom.includes(q)
+          && (cat === 'all' || c.dataset.categorie === cat)
+          && (st  === 'all' || c.dataset.statut    === st);
+    c.style.display = ok ? '' : 'none';
+  });
+}
+
+/* ══ N° Inventaire — identique au backend _generer_num_inventaire ══
+   Format: [FOURNISSEUR-]PREFIX-ANNEE-NNNNN
+   Ex: DELL-INF-2026-00001  ou  INF-2026-00001
+*/
+function resUpdateInvPreview() {
+  var fournisseur = (document.getElementById('resMatFournisseur')?.value || '')
+                    .trim().toUpperCase().replace(/\s+/g,'-').slice(0,10);
+  var cat    = document.getElementById('resMatCategorie')?.value || 'informatique';
+  var prefix = CAT_PREFIXES[cat] || 'MAT';
+  var annee  = document.getElementById('resMatAnneeInv')?.value || new Date().getFullYear();
+  var seq    = document.getElementById('resMatSeqInv')?.value;
+  var seqNum = seq ? String(seq).padStart(5,'0') : 'XXXXX';
+  var preview = fournisseur
+    ? fournisseur + '-' + prefix + '-' + annee + '-' + seqNum
+    : prefix + '-' + annee + '-' + seqNum;
+  document.getElementById('resInvPreview').textContent = preview;
+  var inv = document.getElementById('resMatInventaire');
+  if (!inv.dataset.manual) inv.value = preview.replace('XXXXX','');
+}
+
+function resSyncAnnee() {
+  var d = document.getElementById('resMatDateAchat')?.value;
+  if (d) { document.getElementById('resMatAnneeInv').value = d.split('-')[0]; resUpdateInvPreview(); }
+}
+
+// Marquer le champ inventaire comme édité manuellement
+document.addEventListener('DOMContentLoaded', function(){
+  var inv = document.getElementById('resMatInventaire');
+  if (inv) inv.addEventListener('input', function(){ this.dataset.manual = '1'; });
+  // Init année
+  document.getElementById('resMatAnneeInv').value = new Date().getFullYear();
+  resUpdateInvPreview();
+  resToggleSpecs();
+});
+
+/* ══ Specs techniques ══ */
+function resToggleSpecs() {
+  var cat = document.getElementById('resMatCategorie')?.value;
+  var show = ['informatique','audiovisuel','imprimante','laboratoire'].includes(cat);
+  document.getElementById('resTechSpecs').style.display = show ? 'block' : 'none';
+}
+
+/* ══ Photo upload ══ */
+var _photoBase64 = null;
+
+function resHandlePhotoUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  if (file.size > 5 * 1024 * 1024) { resToast('Image trop lourde (max 5 Mo)', 'err'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _photoBase64 = e.target.result;
+    showPhotoPreview(e.target.result);
+    document.getElementById('resPhotoMsg').style.display = 'block';
+    document.getElementById('resPhotoMsg').textContent = '✅ Image prête : ' + file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPhotoPreview(src) {
+  var img = document.getElementById('photoPreviewImg');
+  var area = document.getElementById('photoUploadArea');
+  var ph = document.getElementById('photoPlaceholder');
+  img.src = src;
+  img.style.display = 'block';
+  ph.style.display = 'none';
+  area.classList.add('has-preview');
+}
+
+function resPreviewFromUrl(url) {
+  if (!url) return;
+  var img = document.getElementById('photoPreviewImg');
+  var area = document.getElementById('photoUploadArea');
+  var ph = document.getElementById('photoPlaceholder');
+  img.src = url;
+  img.onerror = function(){ img.style.display='none'; ph.style.display='block'; area.classList.remove('has-preview'); };
+  img.onload  = function(){ img.style.display='block'; ph.style.display='none'; area.classList.add('has-preview'); };
+}
+
+function resetPhotoUI() {
+  _photoBase64 = null;
+  var img = document.getElementById('photoPreviewImg');
+  var area = document.getElementById('photoUploadArea');
+  var ph = document.getElementById('photoPlaceholder');
+  img.src = ''; img.style.display = 'none';
+  ph.style.display = 'block';
+  area.classList.remove('has-preview');
+  document.getElementById('resMatPhotoFile').value = '';
+  document.getElementById('resPhotoMsg').style.display = 'none';
+}
+
+/* ══ Modal helpers ══ */
+function resOpenModal(type) {
+  if (type === 'zone') {
+    document.getElementById('resZoneId').value     = '';
+    document.getElementById('resZoneNom').value    = '';
+    document.getElementById('resZoneCode').value   = '';
+    document.getElementById('resZoneEtage').value  = '0';
+    document.getElementById('resZoneCapacite').value = '10';
+    document.getElementById('resZoneSecurite').value = 'standard';
+    document.getElementById('resZoneDesc').value   = '';
+    document.getElementById('resZoneModalTitle').textContent = '🚪 Nouvelle zone';
+    document.getElementById('resModalZone').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.getElementById('resMatId').value          = '';
+    document.getElementById('resMatNom').value         = '';
+    document.getElementById('resMatInventaire').value  = '';
+    delete document.getElementById('resMatInventaire').dataset.manual;
+    document.getElementById('resMatSerie').value       = '';
+    document.getElementById('resMatFournisseur').value = '';
+    document.getElementById('resMatMarque').value      = '';
+    document.getElementById('resMatModele').value      = '';
+    document.getElementById('resMatZone').value        = '';
+    document.getElementById('resMatStatut').value      = 'disponible';
+    document.getElementById('resMatCategorie').value   = 'informatique';
+    document.getElementById('resMatCPU').value         = '';
+    document.getElementById('resMatRAM').value         = '';
+    document.getElementById('resMatHDD').value         = '';
+    document.getElementById('resMatOS').value          = '';
+    document.getElementById('resMatEcran').value       = '';
+    document.getElementById('resMatDesc').value        = '';
+    document.getElementById('resMatPhoto').value       = '';
+    document.getElementById('resMatDateAchat').value   = '';
+    document.getElementById('resMatValeur').value      = '';
+    // resMatEntreprise supprimé — on utilise resMatFournisseur directement
+    document.getElementById('resMatAnneeInv').value    = new Date().getFullYear();
+    document.getElementById('resMatSeqInv').value      = '';
+    document.getElementById('resMatModalTitle').textContent = '🖥️ Nouveau matériel';
+    resetPhotoUI();
+    resUpdateInvPreview();
+    resToggleSpecs();
+    document.getElementById('resModalMateriel').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+}
+function saveParamsResa() {
+  const payload = {
+    salle_min_minutes:    parseInt(document.getElementById('salle_min_minutes').value)    || 30,
+    salle_max_minutes:    parseInt(document.getElementById('salle_max_minutes').value)    || 1440,
+    materiel_min_minutes: parseInt(document.getElementById('materiel_min_minutes').value) || 60,
+    materiel_max_minutes: parseInt(document.getElementById('materiel_max_minutes').value) || 525600,
+  };
+
+  fetch("{% url 'parametres_reservation_save' %}", {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken()},
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.status === 'success') showToast('✅ ' + d.message, 'green');
+    else showToast('❌ ' + d.message, 'red');
+  })
+  .catch(() => showToast('❌ Erreur réseau', 'red'));
+}
+
+// Helper CSRF (si pas déjà défini)
+function getCsrfToken() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+function showToast(msg, color) {
+  color = color || 'blue';
+  const colorMap = {
+    green:  'var(--green)',
+    red:    'var(--red)',
+    blue:   'var(--blue)',
+    amber:  'var(--amber)',
+  };
+  let t = document.getElementById('_resGlobalToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_resGlobalToast';
+    t.className = 'res-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = colorMap[color] || colorMap.blue;
+  t.style.opacity = '1';
+  t.style.transform = 'translateY(0)';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateY(10px)';
+  }, 3500);
+}
+function resCloseModal(type) {
+  if (type === 'zone') {
+    document.getElementById('resModalZone').classList.remove('open');
+  } else {
+    document.getElementById('resModalMateriel').classList.remove('open');
+  }
+  document.body.style.overflow = '';
+}
+/* ══ JS data ══ */
+var bureauxData = {{ bureaux_json|safe|default:'[]' }};
+
+/* ══ Détails Zone ══ */
+function showZoneDetails(id) {
+  var z = bureauxData.find(function(b){ return String(b.id) === String(id); });
+  if (!z) { resToast('Zone introuvable', 'err'); return; }
+
+  var secColors = {public:'var(--green)',standard:'var(--blue2)',restreint:'var(--amber)',critique:'var(--red)'};
+  var secLabels = {public:'🟢 Public',standard:'🔵 Standard',restreint:'🟠 Restreint',critique:'🔴 Critique'};
+  var secColor  = secColors[z.niveau_securite] || 'var(--text2)';
+  var secLabel  = secLabels[z.niveau_securite] || z.niveau_securite;
+
+  document.getElementById('zoneDetailsTitle').textContent = '🚪 ' + z.nom;
+
+  document.getElementById('zoneDetailsBody').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
+
+    '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px;">📋 Informations</div>' +
+    _detRow('Nom',            z.nom || '—') +
+    _detRow('Code',           z.code_bureau ? '<code style="font-family:var(--mono);color:var(--purple);">'+z.code_bureau+'</code>' : '—') +
+    _detRow('Étage',          z.etage > 0 ? 'Étage ' + z.etage : 'RDC') +
+    _detRow('Statut',         z.statut === 'inactif' ? '<span style="color:var(--red);">⛔ Inactif</span>' : '<span style="color:var(--green);">🟢 Actif</span>') +
+    '</div>' +
+
+    '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px;">🔒 Sécurité & Capacité</div>' +
+    _detRow('Niveau', '<span style="color:'+secColor+';font-weight:700;">'+secLabel+'</span>') +
+    _detRow('Capacité', z.capacite_max + ' personnes') +
+    '</div>' +
+
+    '</div>' +
+
+    (z.description ? '<div style="margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:8px;">📝 Description</div>' +
+    '<p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0;">'+_esc(z.description)+'</p></div>' : '');
+
+  document.getElementById('zoneDetailsBtnEdit').onclick = function(){
+    document.getElementById('resModalZoneDetails').classList.remove('open');
+    document.body.style.overflow = '';
+    resEditZone(z.id, z.nom, z.code_bureau, z.etage, z.capacite_max, z.niveau_securite, z.description);
+  };
+
+  document.getElementById('resModalZoneDetails').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+/* ══ Détails Matériel ══ */
+function showMaterielDetails(id) {
+  var mat = materielsData.find(function(m){ return String(m.id) === String(id); });
+  if (!mat) { resToast('Matériel introuvable', 'err'); return; }
+
+  var statusMap = {
+    disponible: '<span style="color:var(--green);font-weight:700;">✅ Disponible</span>',
+    utilise:    '<span style="color:var(--blue2);font-weight:700;">🔄 Utilisé</span>',
+    maintenance:'<span style="color:var(--amber);font-weight:700;">🔧 Maintenance</span>',
+    hors_service:'<span style="color:var(--red);font-weight:700;">❌ Hors service</span>',
+  };
+
+  document.getElementById('matDetailsTitle').textContent = '🖥️ ' + mat.nom;
+
+  var photoHTML = '';
+  if (mat.photo) {
+    var src = mat.photo.startsWith('http') ? mat.photo : '/media/' + mat.photo;
+    photoHTML = '<img src="'+src+'" alt="'+_esc(mat.nom)+'" style="width:100%;height:160px;object-fit:cover;border-radius:10px;margin-bottom:14px;border:1px solid var(--border);">';
+  }
+
+  var specsHTML = '';
+  if (mat.processeur || mat.ram || mat.stockage || mat.os || mat.ecran) {
+    specsHTML =
+      '<div style="margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:8px;">⚙️ Spécifications techniques</div>' +
+      '<div style="font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.8;">' +
+      (mat.processeur ? '<div>🔲 CPU : <strong style="color:var(--text1);">'+_esc(mat.processeur)+'</strong></div>' : '') +
+      (mat.ram        ? '<div>💾 RAM : <strong style="color:var(--text1);">'+_esc(mat.ram)+'</strong></div>' : '') +
+      (mat.stockage   ? '<div>💿 HDD : <strong style="color:var(--text1);">'+_esc(mat.stockage)+'</strong></div>' : '') +
+      (mat.os         ? '<div>🖥️ OS  : <strong style="color:var(--text1);">'+_esc(mat.os)+'</strong></div>' : '') +
+      (mat.ecran      ? '<div>📺 Écran: <strong style="color:var(--text1);">'+_esc(mat.ecran)+'</strong></div>' : '') +
+      '</div></div>';
+  }
+
+  document.getElementById('matDetailsBody').innerHTML =
+    photoHTML +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
+
+    '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px;">📋 Informations générales</div>' +
+    _detRow('Nom',        mat.nom || '—') +
+    _detRow('Catégorie',  mat.categorie ? mat.categorie.charAt(0).toUpperCase()+mat.categorie.slice(1) : '—') +
+    _detRow('Marque',     mat.marque || '—') +
+    _detRow('Modèle',     mat.modele || '—') +
+    _detRow('Fournisseur',mat.fournisseur || '—') +
+    _detRow('Statut',     statusMap[mat.statut] || mat.statut) +
+    '</div>' +
+
+    '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;">' +
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:10px;">🏷️ Inventaire & Localisation</div>' +
+    _detRow('N° Inventaire', mat.num_inventaire ? '<code style="font-family:var(--mono);font-size:12px;color:var(--purple);font-weight:700;">'+_esc(mat.num_inventaire)+'</code>' : '—') +
+    _detRow('N° Série',      mat.numero_serie ? '<code style="font-family:var(--mono);font-size:11px;color:var(--text3);">'+_esc(mat.numero_serie)+'</code>' : '—') +
+    _detRow('Zone',          mat.zone || '—') +
+    _detRow('Date achat',    mat.date_achat || '—') +
+    _detRow('Valeur',        mat.valeur ? mat.valeur + ' DA' : '—') +
+    '</div>' +
+
+    '</div>' +
+    specsHTML +
+    (mat.description ? '<div style="margin-top:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:8px;">📝 Description / Remarques</div><p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0;">'+_esc(mat.description)+'</p></div>' : '');
+
+  document.getElementById('matDetailsBtnEdit').onclick = function(){
+    document.getElementById('resModalMatDetails').classList.remove('open');
+    document.body.style.overflow = '';
+    resEditMateriel(mat.id);
+  };
+
+  document.getElementById('resModalMatDetails').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+/* ── Helpers ── */
+function _detRow(label, val) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">' +
+    '<span style="color:var(--text3);font-weight:600;">'+label+'</span>' +
+    '<span style="color:var(--text1);text-align:right;max-width:60%;">'+val+'</span>' +
+    '</div>';
+}
+function _esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape') return;
+  resCloseModal('zone');
+  resCloseModal('materiel');
+});
+
+/* ══ Zone : édition ══ */
+function resEditZone(id, nom, code, etage, capacite, securite, desc) {
+  document.getElementById('resZoneId').value      = id;
+  document.getElementById('resZoneNom').value     = nom;
+  document.getElementById('resZoneCode').value    = code;
+  document.getElementById('resZoneEtage').value   = etage;
+  document.getElementById('resZoneCapacite').value= capacite;
+  document.getElementById('resZoneSecurite').value= securite;
+  document.getElementById('resZoneDesc').value    = desc;
+  document.getElementById('resZoneModalTitle').textContent = '✏️ Modifier : ' + nom;
+  document.getElementById('resModalZone').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+/* ══ Zone : sauvegarder ══ */
+function resSaveZone() {
+  var nom = document.getElementById('resZoneNom').value.trim();
+  if (!nom) { resToast('Le nom est obligatoire', 'err'); return; }
+  var id = document.getElementById('resZoneId').value;
+  var btn = document.getElementById('resBtnSaveZone');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+  var formData = new FormData();
+  formData.append('csrfmiddlewaretoken', RES_CSRF);
+  formData.append('nom',             nom);
+  formData.append('code_bureau',     document.getElementById('resZoneCode').value.trim());
+  formData.append('etage',           document.getElementById('resZoneEtage').value);
+  formData.append('capacite_max',    document.getElementById('resZoneCapacite').value);
+  formData.append('niveau_securite', document.getElementById('resZoneSecurite').value);
+  formData.append('description',     document.getElementById('resZoneDesc').value.trim());
+  if (id) formData.append('bureau_id', id);
+
+  var url = '/bureaux/ajouter/';
+  fetch(url, { method: 'POST', body: formData })
+    .then(function(r){ return r.ok || r.redirected ? r : Promise.reject(r.status); })
+    .then(function(){
+      resToast('✅ Zone enregistrée', 'ok');
+      resCloseModal('zone');
+      setTimeout(function(){ location.reload(); }, 700);
+    })
+    .catch(function(e){ resToast('Erreur serveur : ' + e, 'err'); })
+    .finally(function(){ btn.disabled = false; btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Enregistrer'; });
+}
+
+/* ══ Zone : supprimer ══ */
+function resDeleteZone(id, name) {
+  if (!confirm('Supprimer la zone "' + name + '" ?\n\nCette action est irréversible.')) return;
+  var formData = new FormData();
+  formData.append('csrfmiddlewaretoken', RES_CSRF);
+  fetch('/bureaux/' + id + '/supprimer/', { method: 'POST', body: formData })
+    .then(function(){ resToast('✅ Zone supprimée', 'ok'); setTimeout(function(){ location.reload(); }, 800); })
+    .catch(function(e){ resToast('Erreur : ' + e.message, 'err'); });
+}
+
+/* ══ Matériel : édition ══ */
+function resEditMateriel(id) {
+  var mat = null;
+  for (var i = 0; i < materielsData.length; i++) {
+    if (String(materielsData[i].id) === String(id)) { mat = materielsData[i]; break; }
+  }
+  if (!mat) { resToast('Données non disponibles, rechargez la page', 'err'); return; }
+
+  document.getElementById('resMatId').value          = mat.id || '';
+  document.getElementById('resMatNom').value         = mat.nom || '';
+  document.getElementById('resMatInventaire').value  = mat.num_inventaire || '';
+  document.getElementById('resMatSerie').value       = mat.numero_serie || '';
+  document.getElementById('resMatFournisseur').value = mat.fournisseur || '';
+  document.getElementById('resMatMarque').value      = mat.marque || '';
+  document.getElementById('resMatModele').value      = mat.modele || '';
+  document.getElementById('resMatZone').value        = mat.zone || '';
+  document.getElementById('resMatStatut').value      = mat.statut || 'disponible';
+  document.getElementById('resMatCategorie').value   = mat.categorie || 'autre';
+  document.getElementById('resMatCPU').value         = mat.processeur || '';
+  document.getElementById('resMatRAM').value         = mat.ram || '';
+  document.getElementById('resMatHDD').value         = mat.stockage || '';
+  document.getElementById('resMatOS').value          = mat.os || '';
+  document.getElementById('resMatEcran').value       = mat.ecran || '';
+  document.getElementById('resMatDesc').value        = mat.description || '';
+  document.getElementById('resMatPhoto').value       = mat.photo || '';
+  document.getElementById('resMatDateAchat').value   = mat.date_achat || '';
+  document.getElementById('resMatValeur').value      = mat.valeur || '';
+  document.getElementById('resMatAnneeInv').value    = mat.annee_inv || new Date().getFullYear();
+  document.getElementById('resMatSeqInv').value      = mat.seq_inv || '';
+
+  // Restaurer la preview du numéro d'inventaire existant
+  if (mat.num_inventaire) {
+    document.getElementById('resMatInventaire').dataset.manual = '1';
+    document.getElementById('resMatInventaire').value = mat.num_inventaire;
+    document.getElementById('resInvPreview').textContent = mat.num_inventaire;
+  } else {
+    delete document.getElementById('resMatInventaire').dataset.manual;
+    resUpdateInvPreview();
+  }
+
+  // Photo
+  resetPhotoUI();
+  if (mat.photo) {
+    var src = mat.photo.startsWith('http') ? mat.photo : '/media/' + mat.photo;
+    showPhotoPreview(src);
+    document.getElementById('resMatPhoto').value = mat.photo;
+  }
+
+  document.getElementById('resMatModalTitle').textContent = '✏️ Modifier : ' + (mat.nom || '');
+  resToggleSpecs();
+  document.getElementById('resModalMateriel').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+/* ══ Matériel : sauvegarder ══ */
+async function resSaveMateriel() {
+  var nom = document.getElementById('resMatNom').value.trim();
+  if (!nom) { resToast('Le nom est obligatoire', 'err'); return; }
+
+  var id  = document.getElementById('resMatId').value;
+  var btn = document.getElementById('resBtnSaveMat');
+  btn.disabled = true; btn.innerHTML = '⏳ Enregistrement...';
+
+  // Upload photo si fichier sélectionné
+  var photoPath = document.getElementById('resMatPhoto').value.trim();
+  if (_photoBase64) {
+    try {
+      var uploadResp = await fetch('/api/materiel/upload-photo/', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':RES_CSRF},
+        body: JSON.stringify({photo_data: _photoBase64})
+      });
+      var uploadData = await uploadResp.json();
+      if (uploadData.status === 'success') photoPath = uploadData.path;
+    } catch(e) { /* si l'upload échoue, on continue avec l'URL */ }
+  }
+
+  var invFinal = document.getElementById('resMatInventaire').value.trim();
+  // BUG FIX : fournisseur = champ fournisseur direct (pas "entreprise" qui ne correspond pas au backend)
+  var fournisseurVal = document.getElementById('resMatFournisseur').value.trim();
+  var payload = {
+    id:           id || '',
+    nom:          nom,
+    categorie:    document.getElementById('resMatCategorie').value,
+    fournisseur:  fournisseurVal,
+    marque:       document.getElementById('resMatMarque').value.trim(),
+    modele:       document.getElementById('resMatModele').value.trim(),
+    numero_serie: document.getElementById('resMatSerie').value.trim(),
+    date_achat:   document.getElementById('resMatDateAchat').value,
+    valeur:       document.getElementById('resMatValeur').value.trim(),
+    zone:         document.getElementById('resMatZone').value,
+    statut:       document.getElementById('resMatStatut').value,
+    processeur:   document.getElementById('resMatCPU').value.trim(),
+    ram:          document.getElementById('resMatRAM').value.trim(),
+    stockage:     document.getElementById('resMatHDD').value.trim(),
+    os:           document.getElementById('resMatOS').value.trim(),
+    ecran:        document.getElementById('resMatEcran').value.trim(),
+    description:  document.getElementById('resMatDesc').value.trim(),
+    photo:        photoPath,
+    num_inventaire: invFinal,
+    // Pour la génération côté serveur (fournisseur = même valeur, annee et seq pour l'auto-génération)
+    annee_inv:    document.getElementById('resMatAnneeInv').value,
+    seq_inv:      document.getElementById('resMatSeqInv').value,
+  };
+
+  try {
+    var r = await fetch('/api/materiel/ajouter/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':RES_CSRF},
+      body: JSON.stringify(payload)
+    });
+    var d = await r.json();
+    if (d.status === 'success') {
+      resToast('✅ Matériel ' + (id ? 'modifié' : 'ajouté') + ' — N° ' + (d.num_inventaire || invFinal), 'ok');
+      resCloseModal('materiel');
+      setTimeout(function(){ location.reload(); }, 800);
+    } else {
+      resToast(d.message || 'Erreur serveur', 'err');
+    }
+  } catch(e) {
+    resToast('Erreur réseau : ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Enregistrer';
+  }
+}
+
+/* ══ Matériel : supprimer ══ */
+function resDeleteMateriel(id, name) {
+  if (!confirm('Supprimer "' + name + '" ?\nCette action est irréversible.')) return;
+  fetch('/api/materiel/' + id + '/supprimer/', {
+    method: 'DELETE', headers: { 'X-CSRFToken': RES_CSRF }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.status === 'success') { resToast('✅ Matériel supprimé', 'ok'); setTimeout(function(){ location.reload(); }, 800); }
+    else resToast(d.message || 'Erreur', 'err');
+  })
+  .catch(function(e){ resToast('Erreur : ' + e.message, 'err'); });
+}
+
+/* ══ Exports ══ */
+function exportMaterielPDF(id)  { resToast('📄 Génération PDF...', 'info'); window.open('/api/materiel/' + id + '/pdf/', '_blank'); }
+function exportZonePDF(id, nom) { resToast('📄 Génération rapport zone...', 'info'); window.open('/api/zone/' + id + '/pdf/', '_blank'); }
+function exportZonesPDF()       { resToast('📄 Génération rapport global...', 'info'); window.open('/api/zones/rapport-pdf/', '_blank'); }
+function exportResourcesCSV()   { window.location.href = '/api/ressources/export-csv/'; }
+
+/* ══ Toast ══ */
+function resToast(msg, type) {
+  var t = document.getElementById('restoast');
+  t.textContent = msg;
+  t.style.background = type === 'ok' ? '#10b981' : type === 'err' ? '#ef4444' : '#3b82f6';
+  t.style.opacity = '1'; t.style.transform = 'translateY(0)';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; }, 3500);
+}
+
+/* ══ KPI animation ══ */
+document.querySelectorAll('.kpi-val').forEach(function(el){
+  var text = el.textContent;
+  var num = parseInt(text.replace(/[^0-9]/g,''), 10);
+  if (isNaN(num) || num === 0) return;
+  var duration = 900, step = num / duration * 16, current = 0;
+  var timer = setInterval(function(){
+    current = Math.min(current + step, num);
+    el.textContent = Math.round(current) + (text.includes('%') ? '%' : '');
+    if (current >= num) clearInterval(timer);
+  }, 16);
+});
+</script>
+{% endblock %}

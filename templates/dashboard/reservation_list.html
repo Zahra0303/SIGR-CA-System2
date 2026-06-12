@@ -1,0 +1,763 @@
+{% extends "base.html" %}
+{% block title %}Réservations · SIGR-CA{% endblock %}
+{% block nav_reservations %}active{% endblock %}
+{% block page_title %}Gestion des réservations{% endblock %}
+{% block page_sub %}Calendrier et gestion des créneaux{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex; gap:10px; align-items:center;">
+  
+  <!-- Bouton Nouvelle réservation -->
+  <a href="{% url 'reservation_ajouter' %}" 
+     style="height:38px; padding:0 18px; display:inline-flex; align-items:center; gap:7px; background:var(--blue); color:#fff; border:none; border-radius:10px; font-family:var(--font); font-weight:600; font-size:13px; cursor:pointer; transition:all .15s; text-decoration:none; white-space:nowrap;"
+     onmouseover="this.style.background='var(--blue2)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(59,130,246,.35)'"
+     onmouseout="this.style.background='var(--blue)';this.style.transform='none';this.style.boxShadow='none'">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Nouvelle réservation
+  </a>
+  
+  <!-- Bouton Vue calendrier/liste -->
+  <button onclick="toggleView()" title="Vue calendrier / liste"
+          style="width:38px; height:38px; display:inline-flex; align-items:center; justify-content:center; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; color:var(--text2); cursor:pointer; transition:all .15s;"
+          onmouseover="this.style.background='var(--bg4)';this.style.color='var(--text1)';this.style.borderColor='var(--border3)'"
+          onmouseout="this.style.background='var(--bg3)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+  </button>
+  
+  <!-- Bouton Export -->
+<!-- Bouton Export CSV -->
+<a href="{% url 'admin_reservations_export_csv' %}"
+   title="Exporter CSV"
+   style="width:38px; height:38px; display:inline-flex; align-items:center; justify-content:center; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; color:var(--text2); cursor:pointer; transition:all .15s; text-decoration:none;"
+   onmouseover="this.style.background='var(--bg4)';this.style.color='var(--green)';this.style.borderColor='var(--green)'"
+   onmouseout="this.style.background='var(--bg3)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+</a>
+
+<!-- Bouton Export PDF -->
+<a href="{% url 'admin_reservations_export_pdf' %}"
+   title="Rapport PDF"
+   target="_blank"
+   style="width:38px; height:38px; display:inline-flex; align-items:center; justify-content:center; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; color:var(--text2); cursor:pointer; transition:all .15s; text-decoration:none;"
+   onmouseover="this.style.background='var(--bg4)';this.style.color='var(--red)';this.style.borderColor='var(--red)'"
+   onmouseout="this.style.background='var(--bg3)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+</a>
+  
+  <!-- Badge stats -->
+  
+  
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+/* ═══════════════════════════════════════
+   FONTS & TOKENS (identiques dashboard)
+═══════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --font: 'Space Grotesk', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --bg0: #080d17; --bg1: #0d1320; --bg2: #111827; --bg3: #162032; --bg4: #1c2b40; --bg5: #243347;
+  --border: rgba(99,140,185,.12); --border2: rgba(99,140,185,.18); --border3: rgba(99,140,185,.28);
+  --text1: #e8edf5; --text2: #8fa3bc; --text3: #56708a;
+  --blue: #3b82f6; --blue2: #60a5fa; --cyan: #06b6d4; --green: #10b981; --amber: #f59e0b; --red: #ef4444; --purple: #8b5cf6; --pink: #ec4899;
+  --glow-blue: 0 0 20px rgba(59,130,246,.25); --glow-green: 0 0 20px rgba(16,185,129,.25); --glow-red: 0 0 20px rgba(239,68,68,.25);
+  --glow-amber: 0 0 20px rgba(245,158,11,.25); --glow-purple: 0 0 20px rgba(139,92,246,.25); --glow-cyan: 0 0 20px rgba(6,182,212,.25);
+  --radius: 14px; --radius-sm: 8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: var(--font) !important; background: var(--bg0) !important; }
+.dash-wrap { display: flex; flex-direction: column; gap: 20px; padding-bottom: 32px; }
+
+/* ═══════════════════════════════════════
+   KPI GRID (6 colonnes)
+═══════════════════════════════════════ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+@media (max-width:1300px) { .kpi-grid { grid-template-columns: repeat(3,1fr); } }
+@media (max-width:768px)  { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+
+.kpi {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 18px 16px;
+  position: relative; overflow: hidden;
+  transition: transform .25s, box-shadow .25s; cursor: default;
+}
+.kpi::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at top left, var(--kpi-glow,.05) 0%, transparent 65%);
+  pointer-events: none;
+}
+.kpi:hover { transform: translateY(-4px); box-shadow: var(--kpi-shadow, none); }
+.kpi-accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--kpi-grad); box-shadow: 0 0 12px var(--kpi-color);
+}
+.kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.kpi-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); }
+.kpi-icon-wrap {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--kpi-icon-bg);
+  border: 1px solid var(--kpi-icon-border);
+  font-size: 18px; flex-shrink: 0;
+}
+.kpi-val {
+  font-family: var(--mono); font-size: 38px; font-weight: 700;
+  color: var(--kpi-color); line-height: 1; margin-bottom: 8px;
+  text-shadow: 0 0 30px var(--kpi-glow-text);
+}
+.kpi-sub { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 5px; }
+.kpi-bar { margin-top: 12px; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.kpi-bar-fill { height: 100%; background: var(--kpi-grad); border-radius: 2px; transition: width 1s ease; }
+
+.kpi.blue   { --kpi-color:var(--blue);   --kpi-grad:linear-gradient(90deg,#1d4ed8,#3b82f6); --kpi-glow:rgba(59,130,246,.06); --kpi-shadow:var(--glow-blue);   --kpi-icon-bg:rgba(59,130,246,.12);  --kpi-icon-border:rgba(59,130,246,.22);  --kpi-glow-text:rgba(59,130,246,.4); }
+.kpi.green  { --kpi-color:var(--green);  --kpi-grad:linear-gradient(90deg,#059669,#10b981); --kpi-glow:rgba(16,185,129,.06); --kpi-shadow:var(--glow-green);  --kpi-icon-bg:rgba(16,185,129,.12);  --kpi-icon-border:rgba(16,185,129,.22);  --kpi-glow-text:rgba(16,185,129,.4); }
+.kpi.amber  { --kpi-color:var(--amber);  --kpi-grad:linear-gradient(90deg,#d97706,#f59e0b); --kpi-glow:rgba(245,158,11,.06); --kpi-shadow:var(--glow-amber);  --kpi-icon-bg:rgba(245,158,11,.12);  --kpi-icon-border:rgba(245,158,11,.22);  --kpi-glow-text:rgba(245,158,11,.4); }
+.kpi.purple { --kpi-color:var(--purple); --kpi-grad:linear-gradient(90deg,#7c3aed,#8b5cf6); --kpi-glow:rgba(139,92,246,.06); --kpi-shadow:var(--glow-purple); --kpi-icon-bg:rgba(139,92,246,.12); --kpi-icon-border:rgba(139,92,246,.22); --kpi-glow-text:rgba(139,92,246,.4); }
+.kpi.red    { --kpi-color:var(--red);    --kpi-grad:linear-gradient(90deg,#dc2626,#ef4444); --kpi-glow:rgba(239,68,68,.06);  --kpi-shadow:var(--glow-red);    --kpi-icon-bg:rgba(239,68,68,.12);   --kpi-icon-border:rgba(239,68,68,.22);   --kpi-glow-text:rgba(239,68,68,.4); }
+.kpi.cyan   { --kpi-color:var(--cyan);   --kpi-grad:linear-gradient(90deg,#0891b2,#06b6d4); --kpi-glow:rgba(6,182,212,.06);  --kpi-shadow:var(--glow-cyan);   --kpi-icon-bg:rgba(6,182,212,.12);   --kpi-icon-border:rgba(6,182,212,.22);   --kpi-glow-text:rgba(6,182,212,.4); }
+
+/* ═══════════════════════════════════════
+   CARD
+═══════════════════════════════════════ */
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.card-head {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.card-head-icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.card-title { font-weight: 700; font-size: 14px; color: var(--text1); flex: 1; }
+.card-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+  font-family: var(--mono); letter-spacing: .5px;
+}
+
+/* ═══════════════════════════════════════
+   FILTER TABS
+═══════════════════════════════════════ */
+.filter-tab {
+  padding: 6px 14px; border-radius: 20px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  cursor: pointer; font-size: 11px; font-weight: 600;
+  color: var(--text2); font-family: var(--font); transition: all .18s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.filter-tab.active {
+  background: var(--blue); color: #fff; border-color: var(--blue);
+  box-shadow: 0 0 12px rgba(59,130,246,.3);
+}
+.filter-tab:hover:not(.active) { background: var(--bg4); color: var(--text1); }
+.count-badge {
+  background: rgba(255,255,255,.2); border-radius: 10px;
+  padding: 1px 8px; font-size: 10px; font-weight: 700;
+}
+.filter-tab:not(.active) .count-badge { background: var(--bg4); }
+
+/* ═══════════════════════════════════════
+   CALENDRIER
+═══════════════════════════════════════ */
+.cal-nav {
+  display: flex; justify-content: center; align-items: center;
+  gap: 8px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.cal-nav-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; transition: all .15s;
+}
+.cal-nav-btn:hover { background: var(--bg4); color: var(--text1); border-color: var(--border3); }
+.cal-month-label {
+  font-size: 16px; font-weight: 700; color: var(--text1);
+  min-width: 200px; text-align: center;
+}
+
+.calendar-table {
+  width: 100%; border-collapse: collapse; min-width: 800px;
+}
+.calendar-table th {
+  background: var(--bg3); padding: 12px 8px; text-align: center;
+  font-weight: 700; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--text3); border-bottom: 1px solid var(--border);
+}
+.calendar-table td {
+  border: 1px solid var(--border); vertical-align: top;
+  padding: 8px; width: 14.28%; height: 100px;
+}
+.cal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 6px;
+}
+.cal-day-num.today { color: var(--blue); }
+
+.res-slot {
+  background: rgba(59,130,246,.08); border-left: 3px solid var(--blue);
+  border-radius: 6px; padding: 4px 7px; margin-bottom: 3px;
+  font-size: 10px; cursor: pointer; transition: all .15s;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.res-slot:hover { background: var(--blue); color: #fff; transform: translateX(3px); }
+.res-slot.confirmed { background: rgba(16,185,129,.08); border-left-color: var(--green); }
+.res-slot.confirmed:hover { background: var(--green); }
+.res-slot.pending { background: rgba(245,158,11,.08); border-left-color: var(--amber); }
+.res-slot.pending:hover { background: var(--amber); }
+.res-slot.cancelled { background: rgba(239,68,68,.05); border-left-color: var(--red); opacity: .6; text-decoration: line-through; }
+.res-slot.cancelled:hover { background: var(--red); }
+
+/* ═══════════════════════════════════════
+   TABLE
+═══════════════════════════════════════ */
+.tbl-wrap { overflow-x: auto; }
+.tbl {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+}
+.tbl thead th {
+  padding: 12px 14px; text-align: left;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--text3);
+  border-bottom: 1px solid var(--border); background: var(--bg3);
+  position: sticky; top: 0; z-index: 2;
+}
+.tbl tbody td {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  color: var(--text2); vertical-align: middle;
+}
+.tbl tbody tr { transition: background .15s; }
+.tbl tbody tr:hover { background: var(--bg3); }
+
+/* ═══════════════════════════════════════
+   BADGES
+═══════════════════════════════════════ */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; font-family: var(--mono); letter-spacing: .5px;
+}
+.badge-green  { background: rgba(16,185,129,.12); color: var(--green); border: 1px solid rgba(16,185,129,.2); }
+.badge-red    { background: rgba(239,68,68,.1);   color: var(--red);   border: 1px solid rgba(239,68,68,.15); }
+.badge-blue   { background: rgba(59,130,246,.12); color: var(--blue2); border: 1px solid rgba(59,130,246,.2); }
+.badge-amber  { background: rgba(245,158,11,.12); color: var(--amber); border: 1px solid rgba(245,158,11,.2); }
+.badge-purple { background: rgba(139,92,246,.12); color: var(--purple); border: 1px solid rgba(139,92,246,.2); }
+.badge-gray   { background: rgba(107,114,128,.12); color: #9ca3af;    border: 1px solid rgba(107,114,128,.2); }
+
+/* ═══════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════ */
+.btn {
+  padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;
+  font-weight: 600; font-size: 11px; font-family: var(--font);
+  transition: all .15s; display: inline-flex; align-items: center; gap: 4px;
+  text-decoration: none;
+}
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--blue2); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { background: var(--bg4); color: var(--text1); }
+
+.form-input {
+  padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 8px; font-size: 12.5px; color: var(--text1); font-family: var(--font);
+  outline: none; transition: all .15s;
+}
+.form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+
+/* ═══════════════════════════════════════
+   MODALS
+═══════════════════════════════════════ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(8,13,23,.85); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+.modal {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); width: 520px; max-width: 95vw;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  animation: modal-in .25s cubic-bezier(.22,1,.36,1);
+}
+@keyframes modal-in { from { opacity:0; transform:translateY(20px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+.modal-head {
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-weight: 700; font-size: 16px; color: var(--text1); }
+.modal-close {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border2);
+  background: var(--bg3); color: var(--text2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all .15s;
+}
+.modal-close:hover { background: var(--bg4); color: var(--text1); }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Scrollbar */
+* { scrollbar-width: thin; scrollbar-color: var(--bg5) transparent; }
+</style>
+
+<div class="dash-wrap">
+
+  <!-- ══════════════════════════════════════════
+       KPI STRIP (6 colonnes)
+  ══════════════════════════════════════════ -->
+  <div class="kpi-grid">
+
+    <div class="kpi blue">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Total</span><div class="kpi-icon-wrap">📋</div></div>
+      <div class="kpi-val">{{ total|default:"0" }}</div>
+      <div class="kpi-sub">Réservations</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:100%"></div></div>
+    </div>
+
+    <div class="kpi green">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Confirmées</span><div class="kpi-icon-wrap">✅</div></div>
+      <div class="kpi-val">{{ confirmees|default:"0" }}</div>
+      <div class="kpi-sub up">Actives</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total %}{% widthratio confirmees total 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+
+    <div class="kpi amber">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">En attente</span><div class="kpi-icon-wrap">⏳</div></div>
+      <div class="kpi-val">{{ en_attente|default:"0" }}</div>
+      <div class="kpi-sub">À traiter</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total %}{% widthratio en_attente total 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+
+    <div class="kpi purple">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">À venir</span><div class="kpi-icon-wrap">📅</div></div>
+      <div class="kpi-val">{{ a_venir|default:"0" }}</div>
+      <div class="kpi-sub">Prochainement</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total %}{% widthratio a_venir total 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+
+    <div class="kpi red">
+      <div class="kpi-accent"></div>
+      <div class="kpi-top"><span class="kpi-label">Annulées</span><div class="kpi-icon-wrap">❌</div></div>
+      <div class="kpi-val">{{ annulees|default:"0" }}</div>
+      <div class="kpi-sub down">Rejetées</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:{% if total %}{% widthratio annulees total 100 %}{% else %}0{% endif %}%"></div></div>
+    </div>
+
+    
+
+  </div><!-- /kpi-grid -->
+
+  <!-- ══════════════════════════════════════════
+       FILTRES RESSOURCES
+  ══════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon" style="background:rgba(139,92,246,.12); border:1px solid rgba(139,92,246,.2);">🏢</div>
+      <span class="card-title">Filtrer par ressource</span>
+    </div>
+    <div style="padding:14px 20px; display:flex; gap:8px; flex-wrap:wrap;" id="resourceTabs">
+      <button class="filter-tab active" data-resource="all" onclick="filterResource('all', this)">
+        📋 Toutes <span class="count-badge">{{ total }}</span>
+      </button>
+      {% for bureau in bureaux %}
+      <button class="filter-tab" data-resource="{{ bureau.id }}" onclick="filterResource('{{ bureau.id }}', this)">
+        🚪 {{ bureau.nom }} <span class="count-badge" id="count-{{ bureau.id }}"></span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       VUE CALENDRIER
+  ══════════════════════════════════════════ -->
+  <div class="card" id="calendarView">
+    <div class="card-head">
+      <div class="card-head-icon" style="background:rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.2);">📅</div>
+      <span class="card-title">Calendrier mensuel</span>
+    </div>
+    <div style="padding:20px;">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="prevMonth()">‹</button>
+        <span class="cal-month-label" id="monthYear"></span>
+        <button class="cal-nav-btn" onclick="nextMonth()">›</button>
+        <button class="btn btn-ghost btn-sm" onclick="goToTodayMonth()" style="margin-left:12px;">📅 Aujourd'hui</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <div id="calendarContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       VUE TABLEAU (cachée par défaut)
+  ══════════════════════════════════════════ -->
+  <div class="card" id="tableView" style="display:none;">
+    <div class="card-head">
+      <div class="card-head-icon" style="background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.2);">📋</div>
+      <span class="card-title">Liste des réservations</span>
+      <div style="position:relative; display:flex; align-items:center; margin-left:auto;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" style="position:absolute; left:11px; pointer-events:none; z-index:1;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Rechercher..." style="width:200px; height:36px; padding:0 12px 0 36px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; font-size:12.5px; color:var(--text1); font-family:var(--font); outline:none;" oninput="filterTable()">
+      </div>
+    </div>
+
+    <!-- Filtres statut -->
+    <div style="padding:12px 18px; border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; background:var(--bg3);">
+      <button class="filter-tab active" data-statut="all" onclick="filterByStatut('all', this)">📋 Toutes <span class="count-badge">{{ total }}</span></button>
+      <button class="filter-tab" data-statut="confirmee" onclick="filterByStatut('confirmee', this)">✅ Confirmées <span class="count-badge">{{ confirmees }}</span></button>
+      <button class="filter-tab" data-statut="en_attente" onclick="filterByStatut('en_attente', this)">⏳ En attente <span class="count-badge">{{ en_attente }}</span></button>
+      <button class="filter-tab" data-statut="annulee" onclick="filterByStatut('annulee', this)">❌ Annulées <span class="count-badge">{{ annulees }}</span></button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Titre</th><th>Salle</th><th>Employé</th><th>Début</th><th>Fin</th><th>Participants</th><th>Statut</th><th style="width:130px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for r in reservations %}
+          <tr data-id="{{ r.id }}" data-titre="{{ r.titre|lower }}" data-salle="{{ r.bureau_nom|lower }}" data-statut="{{ r.statut|default:'inconnu' }}">
+            <td>
+              <div style="font-weight:600;color:var(--text1);">{{ r.titre|default:"Sans titre" }}</div>
+              {% if r.description %}<div style="font-size:10px;color:var(--text3);">{{ r.description|truncatechars:40 }}</div>{% endif %}
+            </td>
+            <td><span class="badge badge-blue">{{ r.bureau_nom }}</span></td>
+            <td>{{ r.employe_nom }}<div style="font-size:10px;color:var(--text3);">Badge: {{ r.employe_badge|default:"—" }}</div></td>
+            <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;">{{ r.date_debut|date:"d/m/Y H:i" }}</td>
+            <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;">{{ r.date_fin|date:"d/m/Y H:i" }}</td>
+            <td style="text-align:center;">👥 {{ r.nb_participants|default:1 }}</td>
+            <td>
+              {% if r.statut == 'confirmee' %}<span class="badge badge-green">✅ Confirmée</span>
+              {% elif r.statut == 'en_attente' %}<span class="badge badge-amber">⏳ En attente</span>
+              {% else %}<span class="badge badge-red">❌ Annulée</span>{% endif %}
+            </td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <a href="{% url 'reservation_modifier' r.id %}" class="btn btn-ghost btn-sm" title="Modifier">✏️</a>
+                <button class="btn btn-ghost btn-sm" onclick="showDetails('{{ r.id }}')" title="Détails">👁️</button>
+                {% if r.statut == 'en_attente' %}
+                  <a href="{% url 'reservation_confirmer' r.id %}" class="btn btn-primary btn-sm" title="Confirmer">✅</a>
+                {% endif %}
+                {% if r.statut != 'annulee' %}
+                  <form method="post" action="{% url 'reservation_annuler' r.id %}" style="display:inline;" onsubmit="return confirm('Annuler cette réservation ?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-sm" title="Annuler" style="color:var(--red);">🗑️</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:48px;margin-bottom:12px;opacity:.4;">📭</div>Aucune réservation</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /dash-wrap -->
+
+<!-- ══════════════════════════════════════════
+     MODAL DÉTAILS
+══════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════
+     MODAL DÉTAILS
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="detailsModal" onclick="if(event.target===this)closeDetailsModal();">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">📋 Détails réservation</span>
+      <button class="modal-close" type="button" onclick="closeDetailsModal();">✕</button>
+    </div>
+    <div class="modal-body" id="modalDetailsContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="button" onclick="closeDetailsModal();">Fermer</button>
+    </div>
+  </div>
+</div>
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT (VERSION CORRIGÉE)
+══════════════════════════════════════════ -->
+<script>
+/* ═══════════════════════════════════════
+   DONNÉES GLOBALES
+══════════════════════════════════════ */
+var reservationsData = {{ reservations_json|safe }};
+var currentYear = new Date().getFullYear();
+var currentMonth = new Date().getMonth();
+var currentResourceFilter = 'all';
+
+/* ─── Helper ─── */
+function escapeHtml(text) {
+  if (!text) return '';
+  var div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
+
+/* ─── Vue toggle ─── */
+function toggleView() {
+  var cal = document.getElementById('calendarView');
+  var tbl = document.getElementById('tableView');
+  if (cal.style.display === 'none') {
+    cal.style.display = 'block'; tbl.style.display = 'none'; renderCalendar();
+  } else {
+    cal.style.display = 'none'; tbl.style.display = 'block';
+  }
+}
+
+/* ─── Calendrier ─── */
+function renderCalendar() {
+  var daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  var firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  var startOffset = firstDay === 0 ? 6 : firstDay - 1;
+  var today = new Date();
+  var months = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var days = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+
+  document.getElementById('monthYear').textContent = months[currentMonth] + ' ' + currentYear;
+
+  var html = '<table class="calendar-table"><thead><tr>';
+  for (var i = 0; i < 7; i++) html += '<th>' + days[i] + '</th>';
+  html += '</tr></thead><tbody><tr>';
+
+  for (var i = 0; i < startOffset; i++) html += '<td style="background:var(--bg3);opacity:.3;"></td>';
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    var isToday = (currentYear === today.getFullYear() && currentMonth === today.getMonth() && day === today.getDate());
+    var dayRes = [];
+    if (reservationsData) {
+      for (var r = 0; r < reservationsData.length; r++) {
+        var res = reservationsData[r];
+        if (!res.date_debut) continue;
+        var resDate = new Date(res.date_debut);
+        if (resDate.getFullYear() === currentYear && resDate.getMonth() === currentMonth && resDate.getDate() === day) {
+          if (currentResourceFilter === 'all' || String(res.bureau_id) === String(currentResourceFilter)) dayRes.push(res);
+        }
+      }
+    }
+    dayRes.sort(function(a,b){ return new Date(a.date_debut) - new Date(b.date_debut); });
+
+    html += '<td>';
+    html += '<div class="cal-day-num' + (isToday ? ' today' : '') + '">' + day + '</div>';
+    for (var s = 0; s < Math.min(dayRes.length, 3); s++) {
+      var r = dayRes[s];
+      var sc = r.statut === 'confirmee' ? 'confirmed' : (r.statut === 'en_attente' ? 'pending' : 'cancelled');
+      var time = new Date(r.date_debut).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+      html += '<div class="res-slot ' + sc + '" onclick="showDetails(\'' + r.id + '\')" title="' + escapeHtml(r.titre||'') + '">';
+      html += '<span style="font-family:var(--mono);font-size:9px;margin-right:4px;">' + time + '</span>' + escapeHtml(r.titre||'Sans titre');
+      html += '</div>';
+    }
+    if (dayRes.length > 3) html += '<div style="font-size:9px;color:var(--text3);margin-top:3px;">+' + (dayRes.length-3) + '</div>';
+    html += '</td>';
+    if ((startOffset + day) % 7 === 0) html += '</tr><tr>';
+  }
+
+  var total = startOffset + daysInMonth;
+  var rem = 7 - (total % 7);
+  if (rem < 7) for (var i = 0; i < rem; i++) html += '<td style="background:var(--bg3);opacity:.3;"></td>';
+  html += '</tr></tbody></table>';
+  document.getElementById('calendarContainer').innerHTML = html;
+}
+
+function prevMonth() { currentMonth--; if(currentMonth<0){currentMonth=11;currentYear--;} renderCalendar(); }
+function nextMonth() { currentMonth++; if(currentMonth>11){currentMonth=0;currentYear++;} renderCalendar(); }
+function goToTodayMonth() { currentYear=new Date().getFullYear(); currentMonth=new Date().getMonth(); renderCalendar(); }
+
+function filterResource(id, el) {
+  currentResourceFilter = id;
+  document.querySelectorAll('#resourceTabs .filter-tab').forEach(function(t){ t.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  renderCalendar();
+}
+
+function filterTable() {
+  var search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  var rows = document.querySelectorAll('#tableBody tr');
+  rows.forEach(function(row){
+    var titre = row.getAttribute('data-titre') || '';
+    var salle = row.getAttribute('data-salle') || '';
+    row.style.display = (titre.indexOf(search) !== -1 || salle.indexOf(search) !== -1) ? '' : 'none';
+  });
+}
+
+function filterByStatut(statut, btn) {
+  document.querySelectorAll('#tableView .filter-tab').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var rows = document.querySelectorAll('#tableBody tr');
+  rows.forEach(function(row){
+    var rs = row.getAttribute('data-statut');
+    row.style.display = (statut === 'all' || rs === statut) ? '' : 'none';
+  });
+}
+
+/* ═══════════════════════════════════════════
+   MODAL DÉTAILS — utilise les données locales (pas de fetch)
+══════════════════════════════════════════ */
+function buildModalHtml(data) {
+  var debut = data.date_debut ? new Date(data.date_debut).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  var fin   = data.date_fin   ? new Date(data.date_fin  ).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+  var statut = data.statut || 'en_attente';
+  var statusText  = statut === 'confirmee' ? '✅ Confirmée' : statut === 'annulee' ? '❌ Annulée' : '⏳ En attente';
+  var statusClass = statut === 'confirmee' ? 'badge-green'  : statut === 'annulee' ? 'badge-red'  : 'badge-amber';
+
+  function field(label, value, mono) {
+    return '<div>'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:5px;">' + label + '</div>'
+      + '<div style="font-weight:600;color:var(--text1);' + (mono ? 'font-family:var(--mono);font-size:12px;' : '') + '">' + value + '</div>'
+      + '</div>';
+  }
+
+  var html = '';
+
+  /* Titre */
+  html += '<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:6px;">📋 Titre</div>'
+        + '<div style="font-size:17px;font-weight:700;color:var(--text1);">' + escapeHtml(data.titre || 'Sans titre') + '</div>'
+        + '</div>';
+
+  /* Grille infos */
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
+  html += field('🚪 Salle',        '<span class="badge badge-blue">' + escapeHtml(data.bureau_nom || '—') + '</span>');
+  html += field('👤 Employé',       escapeHtml(data.employe_nom || '—'));
+  html += field('📅 Début',         debut, true);
+  html += field('⏰ Fin',           fin,   true);
+  html += field('👥 Participants',  data.nb_participants || 1);
+  html += '<div>'
+        + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:5px;">📊 Statut</div>'
+        + '<span class="badge ' + statusClass + '" style="font-size:12px;padding:5px 12px;">' + statusText + '</span>'
+        + '</div>';
+  html += '</div>';
+
+  /* Récurrence */
+  if (data.recurrence && data.recurrence !== 'none') {
+    var recLabels = {daily:'Quotidien',weekly:'Hebdomadaire',monthly:'Mensuel'};
+    html += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.2);border-radius:8px;font-size:12px;color:var(--purple);">'
+          + '🔁 Récurrence : <strong>' + (recLabels[data.recurrence] || data.recurrence) + '</strong>'
+          + (data.recurrence_fin ? ' jusqu\'au ' + new Date(data.recurrence_fin).toLocaleDateString('fr-FR') : '')
+          + '</div>';
+  }
+
+  /* Description */
+  if (data.description) {
+    html += '<div style="padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border2);">'
+          + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:6px;">📝 Description</div>'
+          + '<div style="font-size:12.5px;color:var(--text2);line-height:1.6;">' + escapeHtml(data.description) + '</div>'
+          + '</div>';
+  }
+
+  return html;
+}
+
+function showDetails(id) {
+  var modal   = document.getElementById('detailsModal');
+  var content = document.getElementById('modalDetailsContent');
+  if (!modal || !content) return;
+
+  /* Chercher dans le tableau local d'abord */
+  var data = null;
+  if (reservationsData) {
+    for (var i = 0; i < reservationsData.length; i++) {
+      if (String(reservationsData[i].id) === String(id)) { data = reservationsData[i]; break; }
+    }
+  }
+
+  /* Ouvrir le modal */
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  if (data) {
+    /* Données locales disponibles — affichage immédiat */
+    content.innerHTML = buildModalHtml(data);
+  } else {
+    /* Fallback : appel API si la donnée n'est pas dans le JSON local */
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);"><div style="font-size:36px;animation:spin 1s linear infinite;display:inline-block;">⏳</div><div style="margin-top:10px;">Chargement...</div></div>';
+    fetch('/api/reservations/' + id + '/details/')
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){ if (d.error) throw new Error(d.error); content.innerHTML = buildModalHtml(d); })
+      .catch(function(e){ content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);"><div style="font-size:40px;">⚠️</div><div style="font-weight:600;margin:8px 0;">Impossible de charger les détails</div><div style="font-size:12px;color:var(--text3);">' + escapeHtml(e.message) + '</div></div>'; });
+  }
+}
+
+/* ═══════════════════════════════════════════
+   FERMETURE MODAL
+══════════════════════════════════════════ */
+function closeDetailsModal() {
+  var modal = document.getElementById('detailsModal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+  var content = document.getElementById('modalDetailsContent');
+  if (content) content.innerHTML = '';
+}
+
+/* Fermeture via onclick inline sur les boutons (✕, Fermer, overlay) */
+
+document.addEventListener('keydown', function(e) {
+  if ((e.key === 'Escape' || e.keyCode === 27) && document.getElementById('detailsModal')?.style.display === 'flex') closeDetailsModal();
+});
+/* ─── Export CSV ─── */
+function exportReservations() {
+  var csv = "Titre,Salle,Employé,Début,Fin,Participants,Statut\n";
+  var rows = document.querySelectorAll('#tableBody tr');
+  rows.forEach(function(row){
+    if (row.style.display !== 'none') {
+      var cells = row.querySelectorAll('td');
+      if (cells.length >= 7) {
+        csv += '"' + (cells[0].innerText.split('\n')[0].replace(/"/g,'""')) + '",';
+        csv += '"' + (cells[1].innerText.replace(/"/g,'""')) + '",';
+        csv += '"' + (cells[2].innerText.split('\n')[0].replace(/"/g,'""')) + '",';
+        csv += '"' + cells[3].innerText + '",';
+        csv += '"' + cells[4].innerText + '",';
+        csv += '"' + cells[5].innerText + '",';
+        csv += '"' + cells[6].innerText + '"\n';
+      }
+    }
+  });
+  var blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'reservations_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+/* ─── Init calendrier + recherche (fusionné avec le DOMContentLoaded du modal ci-dessus) ─── */
+document.addEventListener('DOMContentLoaded', function(){
+  renderCalendar();
+  var si = document.getElementById('searchInput');
+  if (si) si.addEventListener('input', filterTable);
+});
+
+/* ─── KPI counter ─── */
+document.querySelectorAll('.kpi-val').forEach(function(el){
+  var text = el.textContent.replace(/\s/g,' ');
+  var num = parseInt(text.replace(/[^0-9]/g,''),10);
+  if(isNaN(num)||num===0)return;
+  var duration=900, step=num/duration*16, current=0;
+  var timer=setInterval(function(){
+    current=Math.min(current+step,num);
+    el.textContent=Math.round(current)+(text.includes('%')?'%':'');
+    if(current>=num)clearInterval(timer);
+  },16);
+});
+</script>
+
+{% endblock %}

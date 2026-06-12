@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Paramètres · SIGR-CA{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block page_title %}Configuration système{% endblock %}
+{% block page_sub %}Sécurité, profil administrateur et préférences{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex; gap:10px; align-items:center;">
+  <button onclick="saveAllSettings(this)"
+          style="height:38px; padding:0 20px; display:inline-flex; align-items:center; gap:8px; background:var(--blue); color:#fff; border:none; border-radius:10px; font-family:var(--font); font-weight:600; font-size:13px; cursor:pointer; transition:all .15s;"
+          onmouseover="this.style.background='var(--blue2)';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(59,130,246,.35)'"
+          onmouseout="this.style.background='var(--blue)';this.style.transform='none';this.style.boxShadow='none'">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    Enregistrer
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --font:'Space Grotesk',sans-serif; --mono:'JetBrains Mono',monospace;
+  --bg0:#080d17; --bg1:#0d1320; --bg2:#111827; --bg3:#162032; --bg4:#1c2b40; --bg5:#243347;
+  --border:rgba(99,140,185,.12); --border2:rgba(99,140,185,.18); --border3:rgba(99,140,185,.28);
+  --text1:#e8edf5; --text2:#8fa3bc; --text3:#56708a;
+  --blue:#3b82f6; --blue2:#60a5fa; --cyan:#06b6d4; --green:#10b981; --amber:#f59e0b; --red:#ef4444; --purple:#8b5cf6;
+  --radius:14px; --radius-sm:8px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{font-family:var(--font)!important;background:var(--bg0)!important;}
+.dash-wrap{display:flex;flex-direction:column;gap:20px;padding-bottom:40px;}
+
+/* Layout 2 colonnes */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:960px){.grid-2{grid-template-columns:1fr;}}
+
+/* Card */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.card-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.card-head-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.card-title{font-weight:700;font-size:14px;color:var(--text1);flex:1;}
+.card-body{padding:20px;}
+
+/* Section interne */
+.section-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+
+/* Toggle row */
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-info{flex:1;padding-right:16px;}
+.toggle-name{font-weight:600;font-size:12.5px;color:var(--text1);margin-bottom:2px;}
+.toggle-desc{font-size:10px;color:var(--text3);}
+
+/* Toggle switch */
+.sw{position:relative;display:inline-block;width:42px;height:23px;flex-shrink:0;}
+.sw input{opacity:0;width:0;height:0;}
+.sw-slider{position:absolute;cursor:pointer;inset:0;background:var(--bg4);border-radius:23px;transition:.25s;border:1px solid var(--border2);}
+.sw-slider::before{content:'';position:absolute;height:17px;width:17px;left:2px;bottom:2px;background:var(--text3);border-radius:50%;transition:.25s;}
+input:checked+.sw-slider{background:var(--blue);border-color:var(--blue);}
+input:checked+.sw-slider::before{transform:translateX(19px);background:#fff;}
+
+/* Form */
+.form-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:5px;display:block;}
+.form-input,.form-select{width:100%;padding:9px 13px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;color:var(--text1);font-family:var(--font);outline:none;transition:border .15s;}
+.form-input:focus,.form-select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.form-input:disabled{opacity:.45;cursor:not-allowed;}
+.form-select{cursor:pointer;}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:500px){.form-grid-2{grid-template-columns:1fr;}}
+
+/* Avatar */
+.avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;box-shadow:0 4px 20px rgba(59,130,246,.3);font-family:var(--mono);flex-shrink:0;}
+
+/* Séparateur */
+.sep{height:1px;background:var(--border);margin:16px 0;}
+
+/* Sys cards */
+.sys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;}
+.sys-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;text-align:center;}
+.sys-label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:6px;}
+.sys-val{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--text1);}
+
+/* Toast */
+.toast{position:fixed;top:20px;right:20px;z-index:10000;padding:13px 20px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;opacity:0;transform:translateY(-8px);transition:all .25s;pointer-events:none;max-width:360px;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.ok{background:var(--green);}
+.toast.err{background:var(--red);}
+
+*{scrollbar-width:thin;scrollbar-color:var(--bg5) transparent;}
+</style>
+
+<div class="dash-wrap">
+
+  <!-- ═══ LIGNE 1 : Profil + Sécurité ═══ -->
+  <div class="grid-2">
+
+    <!-- ── Profil administrateur ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);">👤</div>
+        <span class="card-title">Profil administrateur</span>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+          <div class="avatar">{{ user.first_name|slice:":1"|upper|default:"A" }}{{ user.last_name|slice:":1"|upper|default:"" }}</div>
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--text1);">{{ user.first_name }} {{ user.last_name }}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">{{ user.email }}</div>
+            <div style="font-size:10px;color:var(--purple);margin-top:4px;font-family:var(--mono);">{{ admin_profile.role|default:"Administrateur Système" }}</div>
+          </div>
+        </div>
+
+        <div class="form-grid-2" style="margin-bottom:12px;">
+          <div>
+            <label class="form-label">Prénom</label>
+            <input class="form-input" id="profile_firstname" value="{{ user.first_name }}">
+          </div>
+          <div>
+            <label class="form-label">Nom</label>
+            <input class="form-input" id="profile_lastname" value="{{ user.last_name }}">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="profile_email" value="{{ user.email }}">
+        </div>
+        <div class="form-grid-2" style="margin-bottom:12px;">
+          <div>
+            <label class="form-label">Téléphone</label>
+            <input class="form-input" id="profile_phone" value="{{ admin_profile.phone|default:'' }}" placeholder="+213 xxx xxx xxx">
+          </div>
+          <div>
+            <label class="form-label">Fonction</label>
+            <input class="form-input" id="profile_role" value="{{ admin_profile.role|default:'Administrateur' }}">
+          </div>
+        </div>
+
+        <div class="sep"></div>
+        <div class="section-label">Changer le mot de passe</div>
+
+        <div style="margin-bottom:10px;">
+          <label class="form-label">Mot de passe actuel</label>
+          <input class="form-input" type="password" id="current_password" placeholder="••••••••">
+        </div>
+        <div class="form-grid-2">
+          <div>
+            <label class="form-label">Nouveau</label>
+            <input class="form-input" type="password" id="new_password" placeholder="••••••••">
+          </div>
+          <div>
+            <label class="form-label">Confirmer</label>
+            <input class="form-input" type="password" id="confirm_password" placeholder="••••••••">
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:8px;">Laissez vide pour ne pas modifier le mot de passe.</div>
+      </div>
+    </div>
+
+    <!-- ── Sécurité ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);">🔐</div>
+        <span class="card-title">Sécurité & Sessions</span>
+      </div>
+      <div class="card-body">
+
+        <div class="section-label">Authentification</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Double authentification (2FA)</div>
+            <div class="toggle-desc">RFID + QR Code pour les zones critiques</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="s_2fa_global" {% if config.s_2fa_global %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Blocage après échecs répétés</div>
+            <div class="toggle-desc">Badge suspendu 15 min après 5 tentatives</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="s_block5" {% if config.s_block5 %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Alerte après 3 échecs</div>
+            <div class="toggle-desc">Notification immédiate à l'administrateur</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="s_alert3" {% if config.s_alert3 %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="sep"></div>
+        <div class="section-label">Sessions utilisateurs</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Expiration de session</div>
+            <div class="toggle-desc">Déconnexion automatique après inactivité</div>
+          </div>
+          <select id="session_timeout" class="form-select" style="width:130px;">
+            <option value="15"  {% if config.session_timeout == '15'  %}selected{% endif %}>15 min</option>
+            <option value="30"  {% if config.session_timeout == '30' or not config.session_timeout %}selected{% endif %}>30 min</option>
+            <option value="60"  {% if config.session_timeout == '60'  %}selected{% endif %}>1 heure</option>
+            <option value="120" {% if config.session_timeout == '120' %}selected{% endif %}>2 heures</option>
+          </select>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Tentatives avant blocage</div>
+            <div class="toggle-desc">Nombre d'échecs consécutifs autorisés</div>
+          </div>
+          <select id="max_failures" class="form-select" style="width:90px;">
+            <option value="3"  {% if config.max_failures == '3'  %}selected{% endif %}>3</option>
+            <option value="5"  {% if config.max_failures == '5' or not config.max_failures %}selected{% endif %}>5</option>
+            <option value="10" {% if config.max_failures == '10' %}selected{% endif %}>10</option>
+          </select>
+        </div>
+
+        <div class="sep"></div>
+        <div class="section-label">Données & Historique</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Conserver l'historique des archivés</div>
+            <div class="toggle-desc">Logs maintenus après archivage des employés</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="s_keep" {% if config.s_keep %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Conservation des logs</div>
+            <div class="toggle-desc">Suppression automatique après cette durée</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" id="log_retention" value="{{ config.log_retention|default:'365' }}"
+                   min="30" max="1095"
+                   style="width:70px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text1);font-family:var(--mono);text-align:center;font-size:13px;">
+            <span style="font-size:10px;color:var(--text3);">jours</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LIGNE 2 : Préférences + Système ═══ -->
+  <div class="grid-2">
+
+    <!-- ── Préférences interface ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.2);">⚙️</div>
+        <span class="card-title">Préférences interface</span>
+      </div>
+      <div class="card-body">
+
+        <div class="section-label">Affichage</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Mode sombre par défaut</div>
+            <div class="toggle-desc">Thème sombre appliqué à la connexion</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="dark_default" {% if config.dark_default %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Auto-refresh surveillance live</div>
+            <div class="toggle-desc">Actualisation des sessions toutes les 10 s</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="s_refresh" {% if config.s_refresh %}checked{% endif %}><span class="sw-slider"></span></label>
+        </div>
+
+        <div class="sep"></div>
+        <div class="section-label">Langue</div>
+
+        
+
+    <!-- ── Informations système ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-icon" style="background:rgba(107,114,128,.12);border:1px solid rgba(107,114,128,.2);">ℹ️</div>
+        <span class="card-title">Informations système</span>
+        <button onclick="loadSysInfo()" title="Actualiser" style="width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text3);cursor:pointer;flex-shrink:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="sys-grid" id="sys-grid">
+          <div class="sys-card">
+            <div class="sys-label">Version</div>
+            <div class="sys-val" style="color:var(--text1);">v2.1.0</div>
+          </div>
+          <div class="sys-card">
+            <div class="sys-label">Base de données</div>
+            <div class="sys-val" id="sys-db" style="color:var(--green);">—</div>
+          </div>
+          <div class="sys-card">
+            <div class="sys-label">Django</div>
+            <div class="sys-val" id="sys-django" style="color:var(--text1);">—</div>
+          </div>
+          <div class="sys-card">
+            <div class="sys-label">Python</div>
+            <div class="sys-val" id="sys-python" style="color:var(--cyan);">—</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+        <div class="section-label">Dernière mise à jour config</div>
+        <div style="font-size:12px;color:var(--text2);font-family:var(--mono);">
+          {% if config.updated_at %}
+            {{ config.updated_at|date:"d/m/Y à H:i" }} — par {{ config.updated_by|default:"—" }}
+          {% else %}
+            Jamais modifiée
+          {% endif %}
+        </div>
+
+        {% if user.is_superuser %}
+        <div class="sep"></div>
+        <div class="section-label">Zone superadmin</div>
+        <button onclick="resetToDefaults()"
+                style="width:100%;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:var(--radius-sm);color:var(--red);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .15s;"
+                onmouseover="this.style.background='rgba(239,68,68,.14)'"
+                onmouseout="this.style.background='rgba(239,68,68,.08)'">
+          ↩ Rétablir les paramètres par défaut
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function getCsrf() {
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || 'ok') + ' show';
+  setTimeout(function() { t.classList.remove('show'); }, 3200);
+}
+
+function val(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  if (el.type === 'checkbox') return el.checked;
+  return el.value;
+}
+
+function saveAllSettings(btn) {
+  var data = {
+    default_language : val('default_language'),
+    dark_default     : val('dark_default'),
+    s_refresh        : val('s_refresh'),
+    s_2fa_global     : val('s_2fa_global'),
+    s_block5         : val('s_block5'),
+    s_alert3         : val('s_alert3'),
+    s_keep           : val('s_keep'),
+    session_timeout  : val('session_timeout'),
+    max_failures     : val('max_failures'),
+    log_retention    : val('log_retention'),
+
+    profile_update: {
+      first_name       : val('profile_firstname') || '',
+      last_name        : val('profile_lastname')  || '',
+      email            : val('profile_email')     || '',
+      phone            : val('profile_phone')     || '',
+      role             : val('profile_role')      || '',
+      current_password : val('current_password')  || '',
+      new_password     : val('new_password')      || '',
+      confirm_password : val('confirm_password')  || '',
+    }
+  };
+
+  var origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Enregistrement…';
+
+  fetch("{% url 'api_parametres_save' %}", {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.status === 'success') {
+      showToast('✅ ' + res.message, 'ok');
+      setTimeout(function() { location.reload(); }, 1400);
+    } else {
+      showToast('❌ ' + res.message, 'err');
+    }
+  })
+  .catch(function() { showToast('❌ Erreur réseau', 'err'); })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = origHtml;
+  });
+}
+
+function resetToDefaults() {
+  if (!confirm('Rétablir tous les paramètres aux valeurs par défaut ?')) return;
+  fetch("{% url 'api_parametres_reset' %}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf() }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.status === 'success') { showToast('✅ ' + res.message, 'ok'); setTimeout(function() { location.reload(); }, 1200); }
+    else showToast('❌ ' + res.message, 'err');
+  });
+}
+
+function loadSysInfo() {
+  fetch("{% url 'api_system_info' %}")
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.status !== 'success') return;
+      var db   = document.getElementById('sys-db');
+      var dj   = document.getElementById('sys-django');
+      var py   = document.getElementById('sys-python');
+      if (db)  { db.textContent  = d.db_status; db.style.color = d.db_status === 'Connecté' ? 'var(--green)' : 'var(--red)'; }
+      if (dj)  dj.textContent  = d.django;
+      if (py)  py.textContent  = d.python;
+    })
+    .catch(function() {});
+}
+
+/* Spin animation */
+var s = document.createElement('style');
+s.textContent = '@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+document.head.appendChild(s);
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadSysInfo();
+});
+</script>
+{% endblock %}
