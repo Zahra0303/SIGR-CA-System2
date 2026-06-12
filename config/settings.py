@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'your-secret-key-here'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
@@ -72,15 +72,28 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # djongo reste pour les sessions et les modèles Django (AccessRule, etc.)
+# Après
+import os
+
+DEBUG = False
+ALLOWED_HOSTS = ['*']
+
 DATABASES = {
     'default': {
         'ENGINE': 'djongo',
-        'NAME': 'general_emballage',
+        'NAME': os.environ.get('MONGO_DB_NAME', 'general_emballage'),
         'CLIENT': {
-            'host': 'mongodb://localhost:27017',
+            'host': os.environ.get('MONGO_URI', 'mongodb://localhost:27017'),
         }
     }
 }
+
+# Clés API
+import os
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 
 # On n'utilise plus Django Auth pour les utilisateurs
 # AUTH_USER_MODEL = 'dashboard.Utilisateur'  # ← retiré
