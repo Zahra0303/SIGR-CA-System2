@@ -1,12 +1,10 @@
 # dashboard/models.py
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, User
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
-from django.db import models
-from django.contrib.auth.models import User
 
 
 
@@ -290,10 +288,6 @@ class Reservation(models.Model):
         self.cancelled_by = cancelled_by
         self.save()
 
-# dashboard/models.py
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
 
 class Notification(models.Model):
     """Notification envoyée aux utilisateurs"""
@@ -662,61 +656,5 @@ class WaitingQueue(models.Model):
         db_table = 'waiting_queue'
         ordering = ['resource_id', 'position']
         indexes = [models.Index(fields=['resource_id', 'statut'])]
-# dashboard/models.py - Ajoutez ces modèles
-
-class ApprovalRequest(models.Model):
-    id = models.CharField(max_length=100, primary_key=True)
-    reservation_id = models.CharField(max_length=100)
-    demandeur_id = models.CharField(max_length=100)
-    demandeur_nom = models.CharField(max_length=200)
-    approbateur_id = models.CharField(max_length=100)
-    ressource_nom = models.CharField(max_length=200)
-    titre = models.CharField(max_length=200, blank=True)
-    date_debut = models.DateTimeField()
-    date_fin = models.DateTimeField()
-    nb_participants = models.IntegerField(default=1)
-    niveau = models.IntegerField(default=1)
-    statut = models.CharField(max_length=20, default='en_attente')
-    commentaire = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-
-class ApprovalAuditLog(models.Model):
-    reservation_id = models.CharField(max_length=100)
-    reservation_titre = models.CharField(max_length=200, blank=True)
-    action = models.CharField(max_length=20)
-    approbateur_id = models.CharField(max_length=100)
-    approbateur_nom = models.CharField(max_length=200, blank=True)
-    commentaire = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class ApprovalDelegation(models.Model):
-    delegant_id = models.CharField(max_length=100)
-    delegant_nom = models.CharField(max_length=200)
-    delegataire_id = models.CharField(max_length=100)
-    delegataire_nom = models.CharField(max_length=200)
-    delegataire_email = models.CharField(max_length=200, blank=True)
-    motif = models.TextField(blank=True)
-    date_debut = models.DateField()
-    date_fin = models.DateField()
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class WaitingQueue(models.Model):
-    id = models.CharField(max_length=100, primary_key=True)
-    resource_id = models.CharField(max_length=100)
-    resource_nom = models.CharField(max_length=200)
-    user_id = models.CharField(max_length=100)
-    user_nom = models.CharField(max_length=200)
-    titre = models.CharField(max_length=200, blank=True)
-    date_debut_souhaitee = models.DateTimeField()
-    date_fin_souhaitee = models.DateTimeField()
-    nb_participants = models.IntegerField(default=1)
-    statut = models.CharField(max_length=20, default='en_attente')
-    created_at = models.DateTimeField(auto_now_add=True)
-
 # Indisponibilités planifiées
 # collection: indisponibilites
