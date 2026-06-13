@@ -128,14 +128,20 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
 DEFAULT_FROM_EMAIL = 'SIGR-CA <souhla.ghanem@gmail.com>'
 
 # MongoDB direct (pour toute la logique métier)
-MONGO_CLIENT = MongoClient('localhost', 27017)
-MONGO_DB = MONGO_CLIENT['general_emballage']
+# ✅ Nouveau code
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
+MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'general_emballage')
+MONGO_CLIENT = MongoClient(MONGO_URI)
+MONGO_DB = MONGO_CLIENT[MONGO_DB_NAME]
 
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:8000']
-
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'https://sigr-ca-system2-production.up.railway.app',
+]
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
