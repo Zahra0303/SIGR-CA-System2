@@ -1,1 +1,1 @@
-web: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:7999
+web: python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8080 --timeout 120 --workers 2
